@@ -23,10 +23,21 @@ import matplotlib.animation as animation
 # drawing figures
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
-x = np.array([])
-y = np.array([])
-z = np.array([])
-
+x_tips = np.array([])
+y_tips = np.array([])
+z_tips = np.array([])
+x_traj = np.array([])
+y_traj = np.array([])
+z_traj = np.array([])
+line, = ax.plot(x_traj, y_traj, z_traj, 'g-')
+tips = ax.scatter(x_tips, y_tips, z_tips, c='r', marker='o')
+ax.set_xlim(0.0, 0.4)
+ax.set_ylim(-0.2, 0.2)
+ax.set_zlim(-0.2, 0.2)
+ax.set_xlabel('X')
+ax.set_ylabel('Y')
+ax.set_zlabel('Z')
+# plt.show(block=False)
 # Create a pipeline
 pipeline = rs.pipeline()
 
@@ -76,7 +87,11 @@ align_to = rs.stream.color
 align = rs.align(align_to)
 process_pipeline = GripPipeline()
 # Streaming loop
+#EMA on last depth to reduce effects of glitches
+last_depth_top, last_depth_bot = None, None
+alpha = 0.5
 try:
+    c = 0
     while True:
         # Get frameset of color and depth
         frames = pipeline.wait_for_frames()
@@ -130,22 +145,78 @@ try:
             if M["m00"] != 0:
                 cX = int(M["m10"] / M["m00"])
                 cY = int(M["m01"] / M["m00"])
-                centers.append((cX, cY, np.mean(masked[masked != 0])))
+                centers.append((cX, cY))
                 cv2.circle(image, (cX, cY), 5, (255, 255, 255), -1)
             # print(image.shape)
             # print(depth_image_3d.shape)
         # for pt in centers:
         #     print(depth_image[pt[1], pt[0]])
-        for cx, cy, d in centers:
+        x_tips, y_tips, z_tips = [], [], []
+        for cx, cy in centers:
+            # avg_d = 0
+            # for i in range(cx-5, cx+5):
+            #     for j in range(cy-5, cy+5):
+            #         avg_d += aligned_depth_frame.get_distance(i, j)
             depth = aligned_depth_frame.get_distance(cx, cy)
+            if cy <= color_image.shape[0]//3:
+                if last_depth_top is None:
+                    last_depth_top = depth
+                depth = alpha*last_depth_top + (1 - alpha)*depth
+                # print(depth, last_depth_top)
+                # block sudden jumps
+                if abs(depth - last_depth_top) > 0.01:
+                    depth = last_depth_top
+                last_depth_top = depth
+            else:
+                if last_depth_bot is None:
+                    last_depth_bot = depth
+                depth = alpha*last_depth_bot + (1 - alpha)*depth
+                if abs(depth - last_depth_bot) > 0.01:
+                    depth = last_depth_bot
+                last_depth_bot = depth
+            # depth = aligned_depth_frame.get_distance(cx, cy)
+            # depth = d/1000
             depth_point = rs.rs2_deproject_pixel_to_point(
                 depth_intrin, [cx, cy], depth)
             msg = "%.2lf, %.2lf, %.2lf\n" % (depth_point[0], depth_point[1], depth_point[2])
-            cv2.putText(image, msg, (cx, cy), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-
+            
+            # x_tips.append(depth_point[0])
+            # y_tips.append(depth_point[1])
+            # z_tips.append(depth_point[2])
+            x_tips.append(depth_point[2])
+            y_tips.append(-depth_point[0])
+            z_tips.append(-depth_point[1])
+            if cy >= color_image.shape[0]//4:
+                # np.append(x_traj, depth_point[0])
+                # np.append(y_traj, depth_point[1])
+                # np.append(z_traj, depth_point[2])
+                if c > 150:
+                    x_traj = np.append(x_traj, depth_point[2])
+                    y_traj = np.append(y_traj, -depth_point[0])
+                    z_traj = np.append(z_traj, -depth_point[1])
+                    c = 151
+                cv2.putText(image, msg, (cx, cy), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+            else:
+                cv2.putText(image, msg, (cx, cy), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+        
         cv2.namedWindow('Align Example', cv2.WINDOW_NORMAL)
         cv2.imshow('Align Example', image)
         key = cv2.waitKey(1)
+
+        # Update plot data
+        # print(line)
+        line.set_data(x_traj, y_traj)
+        line.set_3d_properties(z_traj)
+
+        tips._offsets3d = (x_tips, y_tips, z_tips)
+
+        ax.draw_artist(ax.patch)
+        ax.draw_artist(line)
+        # ax.draw_artist(tips)
+        fig.canvas.draw_idle()
+        fig.show()
+        fig.canvas.flush_events()
+        c += 1
         # Press esc or 'q' to close the image window
         if key & 0xFF == ord('q') or key == 27:
             cv2.destroyAllWindows()
