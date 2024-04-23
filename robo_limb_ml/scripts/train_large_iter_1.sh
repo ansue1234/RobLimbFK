@@ -4,5 +4,6 @@ do
                 --batch_size 2048 \
                 --data_path ../data/data.csv \
                 --num_samples 16384 \
-                --exp_name t_test_small_data_large_epoch_1500_$i
+                --exp_name t_test_rand_small_data_large_epoch_1500_$i \
+                --seed $i
 done
