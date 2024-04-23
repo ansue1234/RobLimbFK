@@ -8,7 +8,7 @@ from tqdm import tqdm
 import argparse
 import wandb
 
-torch.manual_seed(1)
+
 # Argument parser setup
 parser = argparse.ArgumentParser(description="Training FK_LSTM model")
 parser.add_argument('--epochs', type=int, default=200, help='Number of epochs to train the model')
@@ -16,6 +16,7 @@ parser.add_argument('--batch_size', type=int, default=2048, help='Batch size for
 parser.add_argument('--num_samples', type=int, default=2**14, help='Number of samples to load')
 parser.add_argument('--data_path', type=str, default='../data/data.csv', help='Path to the training data file')
 parser.add_argument('--exp_name', type=str, default='', help='Things to add to experiment name')
+parser.add_argument('--seed', type=int, default=1)
 args = parser.parse_args()
 
 if __name__ == "__main__":
@@ -33,7 +34,8 @@ if __name__ == "__main__":
         name="LSTM_b{}_e{}_s{}_{}".format(args.batch_size, args.epochs, args.num_samples, args.exp_name)
     )
     # print("Hi")
-
+    torch.manual_seed(args.seed)
+    
     input_size = 11
     hidden_size = 32
     num_layers = 2
@@ -43,7 +45,7 @@ if __name__ == "__main__":
                     hidden_size=hidden_size,
                     num_layers=num_layers,
                     device=device,
-                    batch_first=True)
+                    batch_first=True).to(device=device)
     optimizer = optim.Adam(model.parameters())
     loss_fn = nn.MSELoss()
     batch_size = args.batch_size

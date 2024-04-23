@@ -14,6 +14,7 @@ class FK_LSTM(nn.LSTM):
                                       num_layers,
                                       batch_first=batch_first)
         self.device = device
+        print("device of LSTM", self.device)
         # self.h0 = torch.zeros(self.num_layers, input_size, self.hidden_size).to(self.device)
         # self.c0 = torch.zeros(self.num_layers, input_size, self.hidden_size).to(self.device)
         self.logstd = nn.Parameter(torch.tensor([0.1, 0.1]).to(self.device)).to(self.device)
