@@ -89,6 +89,7 @@ process_pipeline = GripPipeline()
 # Streaming loop
 #EMA on last depth to reduce effects of glitches
 last_depth_top, last_depth_bot = None, None
+lower_pt, upper_pt = None, None
 alpha = 0.5
 try:
     c = 0
@@ -183,6 +184,9 @@ try:
             # x_tips.append(depth_point[0])
             # y_tips.append(depth_point[1])
             # z_tips.append(depth_point[2])
+            R = np.array([[1, 0, 0],
+                          [0, 0, -1],
+                          [0, 1, 0]])
             x_tips.append(depth_point[2])
             y_tips.append(-depth_point[0])
             z_tips.append(-depth_point[1])
@@ -195,10 +199,26 @@ try:
                     y_traj = np.append(y_traj, -depth_point[0])
                     z_traj = np.append(z_traj, -depth_point[1])
                     c = 151
+                lower_pt = depth_point
                 cv2.putText(image, msg, (cx, cy), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
             else:
                 cv2.putText(image, msg, (cx, cy), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
-        
+                upper_pt = depth_point
+        # calculate the bending angle of the two points
+        # assuming the angles are in the correct coord frame
+        if lower_pt is not None and upper_pt is not None:
+            pt_diff = lower_pt - upper_pt
+            # x bending angle x-z plane
+            x_bend_ang = np.arctan2(pt_diff[2], pt_diff[0])
+            # y bending angle y-z plane
+            y_bend_ang = np.arctan2(pt_diff[2], pt_diff[1])
+            # vec2 = np.array([0, 0, 1])
+            # cos_theta = np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
+            # theta = np.arccos(cos_theta)
+            cv2.putText(image, "Bending Angle x: %.2lf" % (x_bend_ang*180/np.pi), (0, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+            cv2.putText(image, "Bending Angle x: %.2lf" % (y_bend_ang*180/np.pi), (0, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+            print("Bending Angle x: %.2lf" % (x_bend_ang*180/np.pi))
+            print("Bending Angle y: %.2lf" % (y_bend_ang*180/np.pi))
         cv2.namedWindow('Align Example', cv2.WINDOW_NORMAL)
         cv2.imshow('Align Example', image)
         key = cv2.waitKey(1)
