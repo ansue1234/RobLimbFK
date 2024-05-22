@@ -11,10 +11,10 @@ void setup() {
 
 void loop() {
   for (int i = 0; i < NUM_LEDS; i++) {
-    if (i % 3 == 0) {
+    // if (i % 3 == 0) {
       leds[i] = CRGB(0, 255, 0);
       FastLED.show();
-    }
+    // }
   }
 }
   

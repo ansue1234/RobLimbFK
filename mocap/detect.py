@@ -179,7 +179,7 @@ try:
             # depth = d/1000
             depth_point = rs.rs2_deproject_pixel_to_point(
                 depth_intrin, [cx, cy], depth)
-            msg = "%.2lf, %.2lf, %.2lf\n" % (depth_point[0], depth_point[1], depth_point[2])
+            
             
             # x_tips.append(depth_point[0])
             # y_tips.append(depth_point[1])
@@ -187,17 +187,30 @@ try:
             R = np.array([[1, 0, 0],
                           [0, 0, -1],
                           [0, 1, 0]])
-            x_tips.append(depth_point[2])
-            y_tips.append(-depth_point[0])
-            z_tips.append(-depth_point[1])
-            if cy >= color_image.shape[0]//4:
+            depth_point = [depth_point[2], -depth_point[0], -depth_point[1]]
+            msg = "%.2lf, %.2lf, %.4lf" % (depth_point[0], depth_point[1], depth_point[2])
+            # x_tips.append(depth_point[2])
+            # y_tips.append(-depth_point[0])
+            # z_tips.append(-depth_point[1])
+            x_tips.append(depth_point[0])
+            y_tips.append(depth_point[1])
+            z_tips.append(depth_point[2])
+            cv2.circle(image, (250, 100), 5, (255, 255, 255), -1)
+            cv2.circle(image, (350, 200), 5, (255, 255, 255), -1)
+            cv2.circle(image, (350, 100), 5, (255, 255, 255), -1)
+            cv2.circle(image, (250, 200), 5, (255, 255, 255), -1)
+            if cy >= 100 and cy <= 200 and cx >= 250 and cx <= 350:
+            # if cy >= color_image.shape[0]//3:
                 # np.append(x_traj, depth_point[0])
                 # np.append(y_traj, depth_point[1])
                 # np.append(z_traj, depth_point[2])
                 if c > 150:
-                    x_traj = np.append(x_traj, depth_point[2])
-                    y_traj = np.append(y_traj, -depth_point[0])
-                    z_traj = np.append(z_traj, -depth_point[1])
+                    # x_traj = np.append(x_traj, depth_point[2])
+                    # y_traj = np.append(y_traj, -depth_point[0])
+                    # z_traj = np.append(z_traj, -depth_point[1])
+                    x_traj = np.append(x_traj, depth_point[0])
+                    y_traj = np.append(y_traj, depth_point[1])
+                    z_traj = np.append(z_traj, depth_point[2])
                     c = 151
                 lower_pt = depth_point
                 cv2.putText(image, msg, (cx, cy), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
@@ -207,18 +220,18 @@ try:
         # calculate the bending angle of the two points
         # assuming the angles are in the correct coord frame
         if lower_pt is not None and upper_pt is not None:
-            pt_diff = lower_pt - upper_pt
+            pt_diff = np.array(lower_pt) - np.array(upper_pt)
             # x bending angle x-z plane
-            x_bend_ang = np.arctan2(pt_diff[2], pt_diff[0])
+            x_bend_ang = np.pi/2 + np.arctan2(pt_diff[2], pt_diff[0])
             # y bending angle y-z plane
-            y_bend_ang = np.arctan2(pt_diff[2], pt_diff[1])
+            y_bend_ang = np.pi/2 + np.arctan2(pt_diff[2], pt_diff[1])
             # vec2 = np.array([0, 0, 1])
             # cos_theta = np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
             # theta = np.arccos(cos_theta)
             cv2.putText(image, "Bending Angle x: %.2lf" % (x_bend_ang*180/np.pi), (0, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-            cv2.putText(image, "Bending Angle x: %.2lf" % (y_bend_ang*180/np.pi), (0, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-            print("Bending Angle x: %.2lf" % (x_bend_ang*180/np.pi))
-            print("Bending Angle y: %.2lf" % (y_bend_ang*180/np.pi))
+            cv2.putText(image, "Bending Angle y: %.2lf" % (y_bend_ang*180/np.pi), (0, 75), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+            # print("Bending Angle x: %.2lf" % (x_bend_ang*180/np.pi))
+            # print("Bending Angle y: %.2lf" % (y_bend_ang*180/np.pi))
         cv2.namedWindow('Align Example', cv2.WINDOW_NORMAL)
         cv2.imshow('Align Example', image)
         key = cv2.waitKey(1)

@@ -32,15 +32,15 @@ class GripPipeline:
         self.__filter_contours_contours = self.find_contours_output
         self.__filter_contours_min_area = 0.0
         self.__filter_contours_min_perimeter = 0.0
-        self.__filter_contours_min_width = 5.0
+        self.__filter_contours_min_width = 10.0
         self.__filter_contours_max_width = 1000.0
-        self.__filter_contours_min_height = 5.0
+        self.__filter_contours_min_height = 20.0
         self.__filter_contours_max_height = 1000.0
         self.__filter_contours_solidity = [0.0, 100.0]
         self.__filter_contours_max_vertices = 1000.0
         self.__filter_contours_min_vertices = 0.0
-        self.__filter_contours_min_ratio = 0.25
-        self.__filter_contours_max_ratio = 2.0
+        self.__filter_contours_min_ratio = 0.0
+        self.__filter_contours_max_ratio = 1000.0
 
         self.filter_contours_output = None
 
@@ -124,7 +124,7 @@ class GripPipeline:
         else:
             mode = cv2.RETR_LIST
         method = cv2.CHAIN_APPROX_SIMPLE
-        contours, _ =cv2.findContours(input, mode=mode, method=method)
+        contours, hierarchy =cv2.findContours(input, mode=mode, method=method)
         return contours
 
     @staticmethod
