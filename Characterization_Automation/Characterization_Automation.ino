@@ -9,10 +9,10 @@ int PWMNX = 4;
 int PWMPY = 3;
 int PWMNY = 2;
 
-int PWMSignal = 0;
+int PWMSignal = 20;
 int antag_pwm_sig = 15;
 int SampleRate = 50;
-int forloop = 80;
+int forloop = 40;
 int forlooprefresh = 1000;
 long hold = 115000;
 float max_angle_limit = 110.0;
@@ -91,7 +91,7 @@ bool characterize_sma(int pwm_signal, int pwm_pin, int antag_pwm_pin)
         int sgn = sign(x_deg);
         float target = -10*sgn;
 //        while (abs(x_deg) > zero_tolerance && sign(x_deg) == sgn) {
-        while ((abs(x_deg - target) > zero_tolerance)) {
+        while (abs(target - x_deg) > zero_tolerance) {
           if (myFlexSensor.available() == true) {
             Serial.print("activating antagonistic x, ");
             Serial.print(antag_pwm_pin);
@@ -112,7 +112,7 @@ bool characterize_sma(int pwm_signal, int pwm_pin, int antag_pwm_pin)
         int c = 0;
         int sgn = sign(y_deg);
         float target = -10*sgn;
-        while ((abs(y_deg - target) > zero_tolerance)) {
+        while (abs(target - y_deg) > zero_tolerance) {
           if (myFlexSensor.available() == true) {
             Serial.println("activating antagonistic y");
             Serial.print(antag_pwm_pin);
@@ -153,13 +153,13 @@ void loop()
   delay(5000);
 //  start = true;
   if (myFlexSensor.available() == true && start) {
-      Serial.println("Characterizing Positive X");
-      for (int i = PWMSignal; i < 256; i++) {
-        bool max_reached = characterize_sma(i, PWMPX, PWMNX);
-        if (max_reached) {
-          break;
-        }
-      }
+//      Serial.println("Characterizing Positive X");
+//      for (int i = PWMSignal; i < 256; i++) {
+//        bool max_reached = characterize_sma(i, PWMPX, PWMNX);
+//        if (max_reached) {
+//          break;
+//        }
+//      }
       Serial.println("Characterizing Negative X");
       for (int i = PWMSignal; i < 256; i++) {
         bool max_reached = characterize_sma(i, PWMNX, PWMPX);
