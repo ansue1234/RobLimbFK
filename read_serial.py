@@ -13,5 +13,5 @@ def readserial(comport, baudrate):
 
 if __name__ == '__main__':
 
-    readserial('/dev/ttyACM0', 9600)
+    readserial('/dev/ttyACM1', 9600)
 # Current limb -10, -12 deg bias
