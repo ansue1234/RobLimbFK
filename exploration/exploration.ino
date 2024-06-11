@@ -106,10 +106,12 @@ Coord* get_sampled_x_y(float sampled_val) {
 }
 
 Cell* x_y_to_cell(float x, float y) {
-  float resolution_y = max_state / num_rows;
-  float resolution_x = max_state / num_cols;
-  int row = (int) ((y + max_state) / resolution_y);
-  int col = (int) ((x + max_state) / resolution_x);
+  float resolution_y = 2 * max_state / num_rows;
+  float resolution_x = 2 * max_state / num_cols;
+  int row = (int) ((y - max_state) / resolution_y);
+  int col = (int) ((x - max_state) / resolution_x);
+  row = max(0, min(num_cells - 1, row))
+  col = max(0, min(num_cells - 1, col))
   Cell* cell = (Cell*) malloc(sizeof(Cell));
   cell->x = col;
   cell->y = row;
