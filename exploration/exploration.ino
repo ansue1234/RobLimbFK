@@ -66,8 +66,8 @@ Coord* current_coord;
 int x_y_to_index(float x, float y) {
   float resolution_y = max_state / num_rows;
   float resolution_x = max_state / num_cols;
-  int row = (int) ((y + max_state) / resolution_y);
-  int col = (int) ((x + max_state) / resolution_x);
+  int row = (int) ((y - max_state) / resolution_y);
+  int col = (int) ((x - max_state) / resolution_x);
   return row*num_cols + col;
 }
 
