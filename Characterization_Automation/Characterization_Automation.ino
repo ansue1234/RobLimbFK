@@ -165,27 +165,27 @@ void loop()
   delay(5000);
 //  start = true;
   if (myFlexSensor.available() == true && start) {
-//      Serial.println("Characterizing Positive X");
-//      for (int i = PWMSignal; i < 256; i++) {
-//        bool max_reached = characterize_sma(i, PWMPX, PWMNX);
-//        if (max_reached) {
-//          break;
-//        }
-//      }
-//      Serial.println("Characterizing Negative X");
-//      for (int i = PWMSignal; i < 256; i++) {
-//        bool max_reached = characterize_sma(i, PWMNX, PWMPX);
-//        if (max_reached) {
-//          break;
-//        }
-//      }
-//      Serial.println("Characterizing Positive Y");
-//      for (int i = PWMSignal; i < 256; i++) {
-//        bool max_reached = characterize_sma(i, PWMPY, PWMNY);
-//        if (max_reached) {
-//          break;
-//        }
-//      }
+      Serial.println("Characterizing Positive X");
+      for (int i = PWMSignal; i < 256; i++) {
+        bool max_reached = characterize_sma(i, PWMPX, PWMNX);
+        if (max_reached) {
+          break;
+        }
+      }
+      Serial.println("Characterizing Negative X");
+      for (int i = PWMSignal; i < 256; i++) {
+        bool max_reached = characterize_sma(i, PWMNX, PWMPX);
+        if (max_reached) {
+          break;
+        }
+      }
+      Serial.println("Characterizing Positive Y");
+      for (int i = PWMSignal; i < 256; i++) {
+        bool max_reached = characterize_sma(i, PWMPY, PWMNY);
+        if (max_reached) {
+          break;
+        }
+      }
       Serial.println("Characterizing Negative Y");
       for (int i = PWMSignal; i < 256; i++) {
         bool max_reached = characterize_sma(i, PWMNY, PWMPY);

@@ -55,8 +55,8 @@ int kill = 0;
 float PWM_signals[11];
 
 // Exploration map
-const int num_rows = 22;
-const int num_cols = 22;
+const int num_rows = 2;
+const int num_cols = 2;
 const int num_cells = num_rows*num_cols;
 int count_grid [num_cells] = {0}; // x is columns, y is rows
 float running_max = 0.0; // using float to prevent integer division
@@ -64,15 +64,26 @@ float total_counts = 0.0;
 Coord* current_coord;
 
 int x_y_to_index(float x, float y) {
+<<<<<<< HEAD
   float resolution_y = max_state / num_rows;
   float resolution_x = max_state / num_cols;
   int row = (int) ((y - max_state) / resolution_y);
   int col = (int) ((x - max_state) / resolution_x);
+=======
+  float resolution_y = 2*max_state / num_rows;
+  float resolution_x = 2*max_state / num_cols;
+  int row = (int) ((y + max_state) / resolution_y);
+  int col = (int) ((x + max_state) / resolution_x);
+  row = max(0, min(num_rows - 1, row));
+  col = max(0, min(num_cols - 1, col));
+>>>>>>> 4cc47b2 (exploration more debug)
   return row*num_cols + col;
 }
 
 void update_count_grid(float x, float y) {
   int index = x_y_to_index(x, y);
+//  Serial.print("index: ");
+//  Serial.println(index);
   count_grid[index] += 1;
   total_counts += 1;
   if (count_grid[index] > running_max) {
@@ -81,12 +92,12 @@ void update_count_grid(float x, float y) {
 }
 
 Coord* index_to_x_y(int index) {
-  float resolution_y = max_state / num_rows;
-  float resolution_x = max_state / num_cols;
+  float resolution_y = 2*max_state / num_rows;
+  float resolution_x = 2*max_state / num_cols;
   int row = index / num_cols;
   int col = index % num_cols;
-  float x = col * resolution_x - max_state;
-  float y = row * resolution_y - max_state;
+  float x = (2 * col + 1) / 2 * resolution_x - max_state;
+  float y = (2 * row + 1) / 2 * resolution_y - max_state;
   Coord* x_y = (Coord*) malloc(sizeof(Coord));
   x_y->x = x;
   x_y->y = y;
@@ -108,13 +119,11 @@ Coord* get_sampled_x_y(float sampled_val) {
 Cell* x_y_to_cell(float x, float y) {
   float resolution_y = 2 * max_state / num_rows;
   float resolution_x = 2 * max_state / num_cols;
-  int row = (int) ((y - max_state) / resolution_y);
-  int col = (int) ((x - max_state) / resolution_x);
-  row = max(0, min(num_cells - 1, row))
-  col = max(0, min(num_cells - 1, col))
+  int row = (int) ((y + max_state) / resolution_y);
+  int col = (int) ((x + max_state) / resolution_x);
   Cell* cell = (Cell*) malloc(sizeof(Cell));
-  cell->x = col;
-  cell->y = row;
+  cell->x = max(0, min(num_cols - 1, col));
+  cell->y = max(0, min(num_rows - 1, row));
   return cell;
 }
 
@@ -132,6 +141,7 @@ float* PWMRange(float PWMMax, float PWMMin){
       //Serial.println((PWM_signals[i]);
     }
   }
+
   return PWM_signals; 
 }
 
@@ -170,6 +180,7 @@ void setup()
   Serial.println("Refresh Complete");
 
   current_coord = (Coord*)malloc(sizeof(Coord));
+//  randomSeed(analogRead(0));
 
 }
 
@@ -208,10 +219,15 @@ int DataWrite(int PWMPX_Sig_learned, int PWMNX_Sig_learned, int PWMPY_Sig_learne
           //Serial.println("NY 19-30");
           float* NYarray = PWMRange(PWMMaxNY, PWMMinNY);
           int PWMNY_Sig = NYarray[PWMNY_Sig_learned];
-          analogWrite(PWMPX,PWMPX_Sig);
-          analogWrite(PWMNX,PWMNX_Sig);
-          analogWrite(PWMPY,PWMPY_Sig);
-          analogWrite(PWMNY,PWMNY_Sig);
+          if (((PWMPX_Sig != 0) && (PWMNX_Sig != 0)) || ((PWMPY_Sig != 0) && (PWMNY_Sig != 0))) {
+            Serial.println("antagonistic pair both activated!!!!!");            
+          } else {
+            analogWrite(PWMPX,PWMPX_Sig);
+            analogWrite(PWMNX,PWMNX_Sig);
+            analogWrite(PWMPY,PWMPY_Sig);
+            analogWrite(PWMNY,PWMNY_Sig);
+          }
+          
           Serial.print(",");
           Serial.print(PWMPX_Sig);
           Serial.print(",");
@@ -244,6 +260,17 @@ void loop()
   Coord* sampled_coord = get_sampled_x_y(rand_select_thresh);
   Cell* sampled_cell = x_y_to_cell(sampled_coord->x, sampled_coord->y);
   Cell* current_cell = x_y_to_cell(current_coord->x, current_coord->y);
+  Serial.print("Sampled Cell");
+  Serial.print(sampled_cell->x);
+  Serial.print(",");
+  Serial.print(sampled_cell->y);
+  Serial.println();
+  Serial.print("Current Cell");
+  Serial.print(current_cell->x);
+  Serial.print(",");
+  Serial.print(current_cell->y);
+  Serial.println();
+  
   
   int x_diff = sampled_cell->x - current_cell->x;
   int y_diff = sampled_cell->y - current_cell->y;
@@ -299,6 +326,17 @@ void loop()
     PWMNY_Sig_learned = random(0, 12);
   }
   kill = DataWrite(PWMPX_Sig_learned, PWMNX_Sig_learned, PWMPY_Sig_learned, PWMNY_Sig_learned, PWMMaxPX, PWMMinPX, PWMMaxPY, PWMMinPY, PWMMaxNX, PWMMinNX, PWMMaxNY, PWMMinNY);
+  
+  Serial.println("count grid ");
+  for (int i=0; i < num_cells; i++) {
+    Serial.print(count_grid[i]);
+    Serial.println(",");
+//    if (i % num_cols == 0) {
+//      Serial.println();
+//    }
+  }
+  
+  
   ///////////////////////////Safety Mechanism 
   
   if (kill == 1) {
