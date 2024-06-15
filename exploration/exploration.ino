@@ -116,7 +116,6 @@ void x_y_to_cell(float x, float y, Cell* cell) {
   int col = (int) ((x + max_state) / resolution_x);
   cell->x = max(0, min(num_cols - 1, col));
   cell->y = max(0, min(num_rows - 1, row));
-  return cell;
 }
 
 void get_sampled_cell(Cell* cell, Coord* coord){
@@ -169,6 +168,8 @@ int DataWrite(int x_throttle, int y_throttle)
 
     for (int iter = 0; iter < Length_of_Sample; iter++) {
       if (myFlexSensor.available() == true) {
+        Serial.print("Iter: ");
+        Serial.println(iter);
         current_coord->x = myFlexSensor.getX();
         current_coord->y = myFlexSensor.getY();
         float t = millis();
@@ -320,7 +321,7 @@ void loop()
   int x_diff = sampled_cell->x - current_cell->x;
   int y_diff = sampled_cell->y - current_cell->y;
   // Moving else where and then sampling once within range of target
-  if (dx*dx + dy*dy <= 25) {
+  if (dx*dx + dy*dy <= 100) {
     int rand_dir = random(0, 8);
     if (rand_dir == 0) {
       x_diff = 1;
@@ -352,7 +353,9 @@ void loop()
 
   current_x_throttle = get_next_throttle(current_x_throttle, max_change_throttle_x, x_diff);
   current_y_throttle = get_next_throttle(current_y_throttle, max_change_throttle_y, y_diff);
-  
+  Serial.println("current throttle:");
+  Serial.println(current_x_throttle);
+  Serial.println(current_y_throttle);
   kill = DataWrite(current_x_throttle, current_y_throttle);
   
   Serial.println("count grid ");
@@ -372,9 +375,9 @@ void loop()
     analogWrite(PWMNY, 0);
     current_x_throttle = 0;
     current_y_throttle = 0;
+    get_sampled_cell(sampled_cell, sampled_coord);
     delay(Cool_Time);
   }
-  free(current_cell);
 } 
 
 
