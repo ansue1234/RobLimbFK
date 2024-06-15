@@ -18,10 +18,10 @@ struct Cell
 
 ADS myFlexSensor;
 //PWM of X,Y,-X,-Y
-const int PWMPX = 5;
-const int PWMNX = 4;
-const int PWMPY = 3;
-const int PWMNY = 2;
+const int PWMPX = 12;
+const int PWMNX = 10;
+const int PWMPY = 13;
+const int PWMNY = 4;
 
 const int Length_of_Sample = 10;
 const int SampleRate = 50;
@@ -49,11 +49,11 @@ float PWM_x_signals[num_PWM_signals];
 float PWM_y_signals[num_PWM_signals];
 
 // Maximum change in the binned signal, i.e. the number of index in the PWM array 
-const int max_change_throttle_x = 5;
-const int max_change_throttle_y = 5;
+const int max_change_throttle_x = 1;
+const int max_change_throttle_y = 1;
 // Exploration map
-const int num_rows = 5;
-const int num_cols = 5;
+const int num_rows = 6;
+const int num_cols = 6;
 const int num_cells = num_rows*num_cols;
 int count_grid [num_cells] = {0}; // x is columns, y is rows
 float running_max = 0.0; // using float to prevent integer division
@@ -317,7 +317,8 @@ void loop()
   Serial.print(",");
   Serial.print(current_coord->y);
   Serial.println();
-   
+
+  get_sampled_cell(sampled_cell, sampled_coord);
   int x_diff = sampled_cell->x - current_cell->x;
   int y_diff = sampled_cell->y - current_cell->y;
   // Moving else where and then sampling once within range of target
@@ -348,7 +349,6 @@ void loop()
       x_diff = -1;
       y_diff = -1;
     }
-    get_sampled_cell(sampled_cell, sampled_coord);
   }
 
   current_x_throttle = get_next_throttle(current_x_throttle, max_change_throttle_x, x_diff);
