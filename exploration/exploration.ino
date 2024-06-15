@@ -305,7 +305,7 @@ void loop()
   float dx = sampled_coord->x - current_coord->x;
   float dy = sampled_coord->y - current_coord->y;
 
-  current_cell = x_y_to_cell(current_coord->x, current_coord->y, current_cell);
+  x_y_to_cell(current_coord->x, current_coord->y, current_cell);
   Serial.print("Sampled Pos");
   Serial.print(sampled_coord->x);
   Serial.print(",");
