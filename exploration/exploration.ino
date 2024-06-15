@@ -23,11 +23,6 @@ const int PWMNX = 4;
 const int PWMPY = 3;
 const int PWMNY = 2;
 
-int PWMPX_Sig_learned = 0;
-int PWMNX_Sig_learned = 0;
-int PWMPY_Sig_learned = 0;
-int PWMNY_Sig_learned = 0;
-
 const int Length_of_Sample = 10;
 const int SampleRate = 50;
 
@@ -43,40 +38,40 @@ const float PWMMinPY = 21.00;
 const float PWMMaxNY = 30.00;
 const float PWMMinNY = 19.00;
 
-float BX;
-float BY;
-
 const int Cool_Time = 20000;
 
 const int for_loop_refresh = 100;
 
 int kill = 0;
+const int num_PWM_signals = 21;
 
-float PWM_signals[11];
+float PWM_x_signals[num_PWM_signals];
+float PWM_y_signals[num_PWM_signals];
 
+// Maximum change in the binned signal, i.e. the number of index in the PWM array 
+const int max_change_throttle_x = 5;
+const int max_change_throttle_y = 5;
 // Exploration map
-const int num_rows = 2;
-const int num_cols = 2;
+const int num_rows = 5;
+const int num_cols = 5;
 const int num_cells = num_rows*num_cols;
 int count_grid [num_cells] = {0}; // x is columns, y is rows
 float running_max = 0.0; // using float to prevent integer division
 float total_counts = 0.0;
 Coord* current_coord;
+Cell* current_cell;
+Coord* sampled_coord;
+Cell* sampled_cell;
+int current_x_throttle = 0;
+int current_y_throttle = 0;
 
 int x_y_to_index(float x, float y) {
-<<<<<<< HEAD
-  float resolution_y = max_state / num_rows;
-  float resolution_x = max_state / num_cols;
-  int row = (int) ((y - max_state) / resolution_y);
-  int col = (int) ((x - max_state) / resolution_x);
-=======
   float resolution_y = 2*max_state / num_rows;
   float resolution_x = 2*max_state / num_cols;
   int row = (int) ((y + max_state) / resolution_y);
   int col = (int) ((x + max_state) / resolution_x);
   row = max(0, min(num_rows - 1, row));
   col = max(0, min(num_cols - 1, col));
->>>>>>> 4cc47b2 (exploration more debug)
   return row*num_cols + col;
 }
 
@@ -91,61 +86,165 @@ void update_count_grid(float x, float y) {
   }
 }
 
-Coord* index_to_x_y(int index) {
+void index_to_x_y(int index, Coord* x_y) {
   float resolution_y = 2*max_state / num_rows;
   float resolution_x = 2*max_state / num_cols;
   int row = index / num_cols;
   int col = index % num_cols;
   float x = (2 * col + 1) / 2 * resolution_x - max_state;
   float y = (2 * row + 1) / 2 * resolution_y - max_state;
-  Coord* x_y = (Coord*) malloc(sizeof(Coord));
   x_y->x = x;
   x_y->y = y;
-  return x_y;
 }
 
-Coord* get_sampled_x_y(float sampled_val) {
+void get_sampled_x_y(float sampled_val, Coord* x_y) {
   // sampled_val is between 0 and 1
   int counts_tot = (running_max + 1) * num_rows * num_cols - total_counts;
   float target = sampled_val * counts_tot;
   for (int i = 0; i < num_rows*num_cols; i++) {
     target -= ((running_max + 1) - count_grid[i]);
     if (target <= 0) {
-      return index_to_x_y(i);
+      return index_to_x_y(i, x_y);
     }
   }
 }
 
-Cell* x_y_to_cell(float x, float y) {
+void x_y_to_cell(float x, float y, Cell* cell) {
   float resolution_y = 2 * max_state / num_rows;
   float resolution_x = 2 * max_state / num_cols;
   int row = (int) ((y + max_state) / resolution_y);
   int col = (int) ((x + max_state) / resolution_x);
-  Cell* cell = (Cell*) malloc(sizeof(Cell));
   cell->x = max(0, min(num_cols - 1, col));
   cell->y = max(0, min(num_rows - 1, row));
   return cell;
 }
 
-//////////////////////////////////////////Generate Arrays
-
-float* PWMRange(float PWMMax, float PWMMin){
-  float increment = (PWMMax - PWMMin)/9; 
-  //Serial.println(increment);
-  for (int i=0; i<=10; i++) {
-    if (i == 0) {
-      PWM_signals[i] = 0;
-    //Serial.println(PWM_signals[i]);
-    } else {
-      PWM_signals[i] = round(PWMMin + increment*(i-1)); //round to nearest integer for PWM
-      //Serial.println((PWM_signals[i]);
-    }
-  }
-
-  return PWM_signals; 
+void get_sampled_cell(Cell* cell, Coord* coord){
+  float rand_select_thresh = random(0, 1000) / 1000.0;
+  get_sampled_x_y(rand_select_thresh, coord);
+  x_y_to_cell(coord->x, coord->y, cell);
 }
 
+//////////////////////////////////////////Generate Arrays
+// P_Max, P_Min, N_Max, N_Min stands for positive max, positive min, negative max, negative min respectively
+void PWMRange(float* pwm_signals, float PWM_P_Max, float PWM_P_Min, float PWM_N_Max, float PWM_N_Min){
+  int num_intervals = num_PWM_signals / 2;
+  float p_increment = (PWM_P_Max - PWM_P_Min)/(num_intervals - 1); 
+  float n_increment = (PWM_N_Max - PWM_N_Min)/(num_intervals - 1);
+  //Serial.println(increment);
+  // Negatives
+  for (int i=0; i<num_intervals; i++) {
+    pwm_signals[i] = (-PWM_N_Max + i*n_increment)*-1;
+  }
+  pwm_signals[num_intervals] = 0;
+  // Positives
+  for (int j=0; j<num_intervals; j++) {
+    pwm_signals[num_intervals + j + 1] = PWM_P_Min + j*p_increment;
+  }
+}
 
+///////////////////////////////////////////////////////////Display Data Output and Actuate SMA
+int DataWrite(int x_throttle, int y_throttle)
+{
+    float actual_px_pwm = 0;
+    float actual_py_pwm = 0;
+    float actual_nx_pwm = 0;
+    float actual_ny_pwm = 0;
+
+    int num_intervals = num_PWM_signals / 2;
+
+    int throttle_x = x_throttle + num_intervals;
+    if (x_throttle > 0) {
+      actual_px_pwm = PWM_x_signals[throttle_x];
+    } else if (x_throttle < 0) {
+      actual_nx_pwm = PWM_x_signals[throttle_x];
+    }
+    
+    int throttle_y = y_throttle + num_intervals;
+    if (y_throttle > 0) {
+      actual_py_pwm = PWM_y_signals[throttle_y];
+    } else if (y_throttle < 0) {
+      actual_ny_pwm = PWM_y_signals[throttle_y];
+    }
+
+    for (int iter = 0; iter < Length_of_Sample; iter++) {
+      if (myFlexSensor.available() == true) {
+        current_coord->x = myFlexSensor.getX();
+        current_coord->y = myFlexSensor.getY();
+        float t = millis();
+        Serial.print(t);
+        Serial.print(",");
+        Serial.print(current_coord->x);
+        Serial.print(",");
+        Serial.print(current_coord->y);
+        
+        //Serial.println("NX 20-35");
+        if (((actual_px_pwm != 0) && (actual_nx_pwm != 0)) || ((actual_py_pwm != 0) && (actual_ny_pwm != 0))) {
+          Serial.println("antagonistic pair both activated!!!!!");   
+          return 1;         
+        } else {
+          analogWrite(PWMPX,actual_px_pwm);
+          analogWrite(PWMNX,actual_nx_pwm);
+          analogWrite(PWMPY,actual_py_pwm);
+          analogWrite(PWMNY,actual_ny_pwm);
+        }
+        Serial.print(",");
+        Serial.print((float)x_throttle);
+        Serial.print(",");
+        Serial.print((float)y_throttle);
+        Serial.print(",");
+        Serial.print(actual_px_pwm);
+        Serial.print(",");
+        Serial.print(actual_nx_pwm);
+        Serial.print(",");
+        Serial.print(actual_py_pwm);
+        Serial.print(",");
+        Serial.print(actual_ny_pwm);
+        Serial.println();
+        if (abs(current_coord->x) > max_state || abs(current_coord->y) > max_state) {
+          Serial.println();
+          Serial.print("exceeding");
+          Serial.println();
+          return 1;
+        }
+        update_count_grid(current_coord->x, current_coord->y);
+        delay(SampleRate);
+      }
+    }      
+    return 0;
+}
+
+int get_next_throttle(int current_throttle, int max_change_throttle, int diff) {
+  if (diff == 0) {
+    if (current_throttle > 0) {
+      // Decelerate move in negative direction
+      diff = -1;
+    } else if (current_throttle < 0) {
+      // Decelerate move in positive direction
+      diff = 1;
+    } 
+  }
+
+  if (diff > 0) {
+    // move in positive direction
+    int throttle_bound = max_change_throttle;
+    if (current_throttle + max_change_throttle >= num_PWM_signals / 2) {
+      throttle_bound = num_PWM_signals / 2 - current_throttle;
+    }
+    int throttle_change = random(0, throttle_bound + 1);
+    return current_throttle + throttle_change;
+  } else if (diff < 0) {
+    //move in negative
+    int throttle_bound = -max_change_throttle;
+    if (current_throttle - max_change_throttle <= -num_PWM_signals / 2) {
+      throttle_bound = -num_PWM_signals / 2 - current_throttle;
+    }
+    int throttle_change = random(throttle_bound, 1);
+    return current_throttle + throttle_change;
+  } else {
+    return current_throttle;
+  }
+}
 
 void setup()
 {
@@ -168,6 +267,10 @@ void setup()
   }
 
 ///////////////////////////////////////////////Refresh Loop can remove 
+  current_coord = (Coord*)malloc(sizeof(Coord));
+  sampled_coord = (Coord*)malloc(sizeof(Coord));
+  sampled_cell = (Cell*)malloc(sizeof(Cell));
+  current_cell = (Cell*)malloc(sizeof(Cell));
 
   for (int i=0; i<=for_loop_refresh; i++) {
     if (myFlexSensor.available() == true) {
@@ -175,107 +278,49 @@ void setup()
       Serial.print(",");
       Serial.print(myFlexSensor.getY());
       Serial.println();
+      current_coord->x = myFlexSensor.getX();
+      current_coord->y = myFlexSensor.getY();
+      x_y_to_cell(current_coord->x, current_coord->y, current_cell);
     }
   }
   Serial.println("Refresh Complete");
-
-  current_coord = (Coord*)malloc(sizeof(Coord));
+  get_sampled_cell(sampled_cell, sampled_coord);
 //  randomSeed(analogRead(0));
-
-}
-
-
-
-///////////////////////////////////////////////////////////Display Data Output and Actuate SMA
-int DataWrite(int PWMPX_Sig_learned, int PWMNX_Sig_learned, int PWMPY_Sig_learned, int PWMNY_Sig_learned, int PWMMaxPX, int PWMMinPX, int PWMMaxPY, int PWMMinPY, int PWMMaxNX, int PWMMinNX, int PWMMaxNY, int PWMMinNY)
-{
-      for (int iter = 0; iter < Length_of_Sample; iter++) {
-        if (myFlexSensor.available() == true) {
-          current_coord->x = myFlexSensor.getX();
-          current_coord->y = myFlexSensor.getY();
-          float t = millis();
-          Serial.print(t);
-          Serial.print(",");
-          Serial.print(current_coord->x);
-          Serial.print(",");
-          Serial.print(current_coord->y);
-          Serial.print(",");
-          Serial.print((float) PWMPX_Sig_learned);
-          Serial.print(",");
-          Serial.print((float) PWMNX_Sig_learned);
-          Serial.print(",");
-          Serial.print((float) PWMPY_Sig_learned);
-          Serial.print(",");
-          Serial.print((float) PWMNY_Sig_learned);
-          //Serial.println("PX 20-30");
-          float* PXarray = PWMRange(PWMMaxPX, PWMMinPX);
-          int PWMPX_Sig = PXarray[PWMPX_Sig_learned];
-          //Serial.println("NX 20-35");
-          float* NXarray = PWMRange(PWMMaxNX, PWMMinNX);
-          int PWMNX_Sig = NXarray[PWMNX_Sig_learned];
-          //Serial.println("PY 21-34");
-          float* PYarray = PWMRange(PWMMaxPY, PWMMinPY);
-          int PWMPY_Sig = PYarray[PWMPY_Sig_learned];
-          //Serial.println("NY 19-30");
-          float* NYarray = PWMRange(PWMMaxNY, PWMMinNY);
-          int PWMNY_Sig = NYarray[PWMNY_Sig_learned];
-          if (((PWMPX_Sig != 0) && (PWMNX_Sig != 0)) || ((PWMPY_Sig != 0) && (PWMNY_Sig != 0))) {
-            Serial.println("antagonistic pair both activated!!!!!");            
-          } else {
-            analogWrite(PWMPX,PWMPX_Sig);
-            analogWrite(PWMNX,PWMNX_Sig);
-            analogWrite(PWMPY,PWMPY_Sig);
-            analogWrite(PWMNY,PWMNY_Sig);
-          }
-          
-          Serial.print(",");
-          Serial.print(PWMPX_Sig);
-          Serial.print(",");
-          Serial.print(PWMNX_Sig);
-          Serial.print(",");
-          Serial.print(PWMPY_Sig);
-          Serial.print(",");
-          Serial.print(PWMNY_Sig);
-          Serial.println();
-          if (abs(current_coord->x) > max_state || abs(current_coord->y) > max_state) {
-            Serial.println();
-            Serial.print("exceeding");
-            Serial.println();
-            return 1;
-          }
-          update_count_grid(current_coord->x, current_coord->y);
-          delay(SampleRate);
-        }
-     }      
-     return 0;
-      
+  PWMRange(PWM_x_signals, PWMMaxPX, PWMMinPX, PWMMaxNX, PWMMinNX);
+  PWMRange(PWM_y_signals, PWMMaxPY, PWMMinPY, PWMMaxNY, PWMMinNY);
+  for (int i=0; i<num_PWM_signals; i++) {
+    Serial.print(PWM_x_signals[i]);
+    Serial.print(",");
+    Serial.print(PWM_y_signals[i]);
+    Serial.println();
+  }
+  Serial.println("PWM Signals Generated");
+  Serial.println("Setup Complete");
 }
 
 void loop()
 {
   
   ///////////////////////////////////////////////////Random Selection
-  
-  float rand_select_thresh = random(0, 1000) / 1000.0;
-  Coord* sampled_coord = get_sampled_x_y(rand_select_thresh);
-  Cell* sampled_cell = x_y_to_cell(sampled_coord->x, sampled_coord->y);
-  Cell* current_cell = x_y_to_cell(current_coord->x, current_coord->y);
-  Serial.print("Sampled Cell");
-  Serial.print(sampled_cell->x);
+  float dx = sampled_coord->x - current_coord->x;
+  float dy = sampled_coord->y - current_coord->y;
+
+  current_cell = x_y_to_cell(current_coord->x, current_coord->y, current_cell);
+  Serial.print("Sampled Pos");
+  Serial.print(sampled_coord->x);
   Serial.print(",");
-  Serial.print(sampled_cell->y);
+  Serial.print(sampled_coord->y);
   Serial.println();
-  Serial.print("Current Cell");
-  Serial.print(current_cell->x);
+  Serial.print("Current Pos");
+  Serial.print(current_coord->x);
   Serial.print(",");
-  Serial.print(current_cell->y);
+  Serial.print(current_coord->y);
   Serial.println();
-  
-  
+   
   int x_diff = sampled_cell->x - current_cell->x;
   int y_diff = sampled_cell->y - current_cell->y;
-  
-  if (x_diff == 0 && y_diff == 0) {
+  // Moving else where and then sampling once within range of target
+  if (dx*dx + dy*dy <= 25) {
     int rand_dir = random(0, 8);
     if (rand_dir == 0) {
       x_diff = 1;
@@ -302,39 +347,20 @@ void loop()
       x_diff = -1;
       y_diff = -1;
     }
+    get_sampled_cell(sampled_cell, sampled_coord);
   }
 
-  if (x_diff > 0) {
-    PWMPX_Sig_learned = random(0, 12);
-    PWMNX_Sig_learned = 0;
-  } else if (x_diff == 0) {
-    PWMPX_Sig_learned = 0;
-    PWMNX_Sig_learned = 0;
-  } else {
-    PWMPX_Sig_learned = 0;
-    PWMNX_Sig_learned = random(0, 12);
-  }
-
-  if (y_diff > 0) {
-    PWMPY_Sig_learned = random(0, 12);
-    PWMNY_Sig_learned = 0;
-  } else if (y_diff == 0) {
-    PWMPY_Sig_learned = 0;
-    PWMNY_Sig_learned = 0;
-  } else {
-    PWMPY_Sig_learned = 0;
-    PWMNY_Sig_learned = random(0, 12);
-  }
-  kill = DataWrite(PWMPX_Sig_learned, PWMNX_Sig_learned, PWMPY_Sig_learned, PWMNY_Sig_learned, PWMMaxPX, PWMMinPX, PWMMaxPY, PWMMinPY, PWMMaxNX, PWMMinNX, PWMMaxNY, PWMMinNY);
+  current_x_throttle = get_next_throttle(current_x_throttle, max_change_throttle_x, x_diff);
+  current_y_throttle = get_next_throttle(current_y_throttle, max_change_throttle_y, y_diff);
+  
+  kill = DataWrite(current_x_throttle, current_y_throttle);
   
   Serial.println("count grid ");
   for (int i=0; i < num_cells; i++) {
     Serial.print(count_grid[i]);
-    Serial.println(",");
-//    if (i % num_cols == 0) {
-//      Serial.println();
-//    }
+    Serial.print(",");
   }
+  Serial.println();
   
   
   ///////////////////////////Safety Mechanism 
@@ -344,10 +370,11 @@ void loop()
     analogWrite(PWMNX, 0);
     analogWrite(PWMPY, 0);
     analogWrite(PWMNY, 0);
+    current_x_throttle = 0;
+    current_y_throttle = 0;
     delay(Cool_Time);
   }
-  free(sampled_cell);
-  free(sampled_coord);
+  free(current_cell);
 } 
 
 
