@@ -70,8 +70,11 @@ int x_y_to_index(float x, float y) {
   float resolution_x = 2*max_state / num_cols;
   int row = (int) ((y + max_state) / resolution_y);
   int col = (int) ((x + max_state) / resolution_x);
+<<<<<<< Updated upstream
   row = max(0, min(num_rows - 1, row));
   col = max(0, min(num_cols - 1, col));
+=======
+>>>>>>> Stashed changes
   return row*num_cols + col;
 }
 
