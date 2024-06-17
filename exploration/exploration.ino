@@ -18,10 +18,10 @@ struct Cell
 
 ADS myFlexSensor;
 //PWM of X,Y,-X,-Y
-const int PWMPX = 5;
-const int PWMNX = 4;
-const int PWMPY = 3;
-const int PWMNY = 2;
+const int PWMPX = 12;
+const int PWMNX = 10;
+const int PWMPY = 13;
+const int PWMNY = 4;
 
 const int Length_of_Sample = 10;
 const int SampleRate = 50;
@@ -49,11 +49,11 @@ float PWM_x_signals[num_PWM_signals];
 float PWM_y_signals[num_PWM_signals];
 
 // Maximum change in the binned signal, i.e. the number of index in the PWM array 
-const int max_change_throttle_x = 5;
-const int max_change_throttle_y = 5;
+const int max_change_throttle_x = 1;
+const int max_change_throttle_y = 1;
 // Exploration map
-const int num_rows = 5;
-const int num_cols = 5;
+const int num_rows = 6;
+const int num_cols = 6;
 const int num_cells = num_rows*num_cols;
 int count_grid [num_cells] = {0}; // x is columns, y is rows
 float running_max = 0.0; // using float to prevent integer division
@@ -119,7 +119,6 @@ void x_y_to_cell(float x, float y, Cell* cell) {
   int col = (int) ((x + max_state) / resolution_x);
   cell->x = max(0, min(num_cols - 1, col));
   cell->y = max(0, min(num_rows - 1, row));
-  return cell;
 }
 
 void get_sampled_cell(Cell* cell, Coord* coord){
@@ -172,6 +171,8 @@ int DataWrite(int x_throttle, int y_throttle)
 
     for (int iter = 0; iter < Length_of_Sample; iter++) {
       if (myFlexSensor.available() == true) {
+        Serial.print("Iter: ");
+        Serial.println(iter);
         current_coord->x = myFlexSensor.getX();
         current_coord->y = myFlexSensor.getY();
         float t = millis();
@@ -319,11 +320,13 @@ void loop()
   Serial.print(",");
   Serial.print(current_coord->y);
   Serial.println();
-   
+
+//  get_sampled_cell(sampled_cell, sampled_coord);
   int x_diff = sampled_cell->x - current_cell->x;
   int y_diff = sampled_cell->y - current_cell->y;
   // Moving else where and then sampling once within range of target
-  if (dx*dx + dy*dy <= 25) {
+  if (dx*dx + dy*dy <= 400) {
+    get_sampled_cell(sampled_cell, sampled_coord);
     int rand_dir = random(0, 8);
     if (rand_dir == 0) {
       x_diff = 1;
@@ -350,12 +353,13 @@ void loop()
       x_diff = -1;
       y_diff = -1;
     }
-    get_sampled_cell(sampled_cell, sampled_coord);
   }
 
   current_x_throttle = get_next_throttle(current_x_throttle, max_change_throttle_x, x_diff);
   current_y_throttle = get_next_throttle(current_y_throttle, max_change_throttle_y, y_diff);
-  
+  Serial.println("current throttle:");
+  Serial.println(current_x_throttle);
+  Serial.println(current_y_throttle);
   kill = DataWrite(current_x_throttle, current_y_throttle);
   
   Serial.println("count grid ");
@@ -375,9 +379,9 @@ void loop()
     analogWrite(PWMNY, 0);
     current_x_throttle = 0;
     current_y_throttle = 0;
+    get_sampled_cell(sampled_cell, sampled_coord);
     delay(Cool_Time);
   }
-  free(current_cell);
 } 
 
 
