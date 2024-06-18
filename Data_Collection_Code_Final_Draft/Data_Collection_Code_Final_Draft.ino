@@ -5,10 +5,10 @@
 
 ADS myFlexSensor;
 //PWM of X,Y,-X,-Y
-int PWMPX = 5;
-int PWMNX = 4;
-int PWMPY = 3;
-int PWMNY = 2;
+const int PWMPX = 12;
+const int PWMNX = 10;
+const int PWMPY = 13;
+const int PWMNY = 4;
 
 int PWMPX_Sig_learned = 0;
 int PWMNX_Sig_learned = 0;
@@ -18,7 +18,7 @@ int PWMNY_Sig_learned = 0;
 int Length_of_Sample = 10;
 int SampleRate = 50;
 
-int max_state = 110; //Boundary of state space
+int max_state = 100; //Boundary of state space
 
 //Set Min and Max based on velocities of limb
 float PWMMaxPX = 30.00;
@@ -94,6 +94,7 @@ void setup()
     }
   }
   Serial.println("Refresh Complete");
+  randomSeed(analogRead(0));
 
 }
 

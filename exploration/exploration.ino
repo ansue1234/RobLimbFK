@@ -26,7 +26,7 @@ const int PWMNY = 4;
 const int Length_of_Sample = 10;
 const int SampleRate = 50;
 
-const int max_state = 110; //Boundary of state space
+const int max_state = 100; //Boundary of state space
 
 //Set Min and Max based on velocities of limb
 const float PWMMaxPX = 30.00;
@@ -318,12 +318,12 @@ void loop()
   Serial.print(current_coord->y);
   Serial.println();
 
-//  get_sampled_cell(sampled_cell, sampled_coord);
+  get_sampled_cell(sampled_cell, sampled_coord);
   int x_diff = sampled_cell->x - current_cell->x;
   int y_diff = sampled_cell->y - current_cell->y;
   // Moving else where and then sampling once within range of target
   if (dx*dx + dy*dy <= 400) {
-    get_sampled_cell(sampled_cell, sampled_coord);
+//    get_sampled_cell(sampled_cell, sampled_coord);
     int rand_dir = random(0, 8);
     if (rand_dir == 0) {
       x_diff = 1;
