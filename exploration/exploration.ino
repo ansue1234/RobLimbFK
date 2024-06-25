@@ -21,7 +21,8 @@ ADS myFlexSensor;
 const int PWMPX = 3;
 const int PWMNX = 5;
 const int PWMPY = 2;
-const int PWMNY = 4;
+const int PWMNY = 4
+;
 
 const int Length_of_Sample = 10;
 const int SampleRate = 50;
@@ -31,7 +32,7 @@ const int max_state = 100; //Boundary of state space
 //Set Min and Max based on velocities of limb
 const float PWMMaxPX = 30.00;
 const float PWMMinPX = 20.00;
-const float PWMMaxNX = 35.00;
+const float PWMMaxNX = 30.00;
 const float PWMMinNX = 20.00;
 const float PWMMaxPY = 34.00;
 const float PWMMinPY = 21.00;
@@ -49,8 +50,8 @@ float PWM_x_signals[num_PWM_signals];
 float PWM_y_signals[num_PWM_signals];
 
 // Maximum change in the binned signal, i.e. the number of index in the PWM array 
-const int max_change_throttle_x = 1;
-const int max_change_throttle_y = 1;
+const int max_change_throttle_x = 3;
+const int max_change_throttle_y = 3;
 // Exploration map
 const int num_rows = 6;
 const int num_cols = 6;
