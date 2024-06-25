@@ -92,8 +92,8 @@ void index_to_x_y(int index, Coord* x_y) {
   float resolution_x = 2*max_state / num_cols;
   int row = index / num_cols;
   int col = index % num_cols;
-  float x = (2 * col + 1) / 2 * resolution_x - max_state;
-  float y = (2 * row + 1) / 2 * resolution_y - max_state;
+  float x = (2.0 * col + 1.0) / 2.0 * resolution_x - max_state;
+  float y = (2.0 * row + 1.0) / 2.0 * resolution_y - max_state;
   x_y->x = x;
   x_y->y = y;
 }
