@@ -18,11 +18,10 @@ struct Cell
 
 ADS myFlexSensor;
 //PWM of X,Y,-X,-Y
-const int PWMPX = 3;
-const int PWMNX = 5;
-const int PWMPY = 2;
-const int PWMNY = 4
-;
+const int PWMPX = 5;
+const int PWMNX = 2;
+const int PWMPY = 4;
+const int PWMNY = 3;
 
 const int Length_of_Sample = 10;
 const int SampleRate = 50;
@@ -250,6 +249,7 @@ int get_next_throttle(int current_throttle, int max_change_throttle, int diff) {
 
 void setup()
 {
+  
   Serial.begin(9600);
   while (!Serial)
     ;
@@ -258,6 +258,7 @@ void setup()
   pinMode(PWMNX,OUTPUT);
   pinMode(PWMPY,OUTPUT);
   pinMode(PWMNY,OUTPUT);
+  randomSeed(analogRead(0));
 
   Wire.begin();
 
