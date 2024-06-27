@@ -49,8 +49,8 @@ float PWM_x_signals[num_PWM_signals];
 float PWM_y_signals[num_PWM_signals];
 
 // Maximum change in the binned signal, i.e. the number of index in the PWM array 
-const int max_change_throttle_x = 3;
-const int max_change_throttle_y = 3;
+const int max_change_throttle_x = 1;
+const int max_change_throttle_y = 1;
 // Exploration map
 const int num_rows = 6;
 const int num_cols = 6;
