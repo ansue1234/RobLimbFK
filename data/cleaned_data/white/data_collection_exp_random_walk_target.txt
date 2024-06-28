@@ -1,4 +1,4 @@
-Time,theta_x,theta_y,X_throttle,Y_throttle,PX_raw,NX_raw,PY_raw,NY_raw
+time,theta_x,theta_y,X_throttle,Y_throttle,PX_raw,NX_raw,PY_raw,NY_raw
 1879.00,-1.50,-24.84,1.00,1.00,20.00,0.00,21.00,0.00
 1986.00,-2.09,-24.84,1.00,1.00,20.00,0.00,21.00,0.00
 2052.00,-2.09,-24.84,1.00,1.00,20.00,0.00,21.00,0.00

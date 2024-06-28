@@ -1,4 +1,4 @@
-Time,theta_x,theta_y,PX,NX,PY,NY,PX_raw,NX_raw,PY_raw,NY_raw
+time,theta_x,theta_y,pwm_px,pwm_nx,pwm_py,pwm_ny,pwm_px_raw,pwm_nx_raw,pwm_py_raw,pwm_ny_raw
 1402.00,0.65,-18.00,0.00,5.00,2.00,0.00,0.00,27.00,22.00,0.00
 1517.00,0.65,-18.00,0.00,5.00,2.00,0.00,0.00,27.00,22.00,0.00
 1583.00,0.65,-18.79,0.00,5.00,2.00,0.00,0.00,27.00,22.00,0.00

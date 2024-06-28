@@ -1,4 +1,4 @@
-Time,theta_x,theta_y,x_throttle,y_throttle,pwm_px_raw,pwm_nx_raw,pwm_py_raw,pwm_ny_raw
+time,theta_x,theta_y,X_throttle,Y_throttle,PX_raw,NX_raw,PY_raw,NY_raw
 1878.00,-4.94,-10.76,0.00,0.00,0.00,0.00,0.00,0.00
 1983.00,-4.94,-10.76,0.00,0.00,0.00,0.00,0.00,0.00
 2046.00,-4.94,-10.76,0.00,0.00,0.00,0.00,0.00,0.00
