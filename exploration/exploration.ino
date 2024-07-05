@@ -18,10 +18,10 @@ struct Cell
 
 ADS myFlexSensor;
 //PWM of X,Y,-X,-Y
-const int PWMPX = 4;
-const int PWMNX = 2;
-const int PWMPY = 5;
-const int PWMNY = 3;
+const int PWMPX = 5;
+const int PWMNX = 3;
+const int PWMPY = 2;
+const int PWMNY = 4;
 
 const int Length_of_Sample = 10;
 const int SampleRate = 50;
@@ -29,14 +29,36 @@ const int SampleRate = 50;
 const int max_state = 100; //Boundary of state space
 
 //Set Min and Max based on velocities of limb
-const float PWMMaxPX = 30.00;
+//Blue Limbs
+//const float PWMMaxPX = 30.00;
+//const float PWMMinPX = 20.00;
+//const float PWMMaxNX = 30.00;
+//const float PWMMinNX = 20.00;
+//const float PWMMaxPY = 34.00;
+//const float PWMMinPY = 21.00;
+//const float PWMMaxNY = 30.00;
+//const float PWMMinNY = 19.00;
+
+//Teal thin SMA limbs
+//const float PWMMaxPX = 20.00;
+//const float PWMMinPX = 10.00;
+//const float PWMMaxNX = 20.00;
+//const float PWMMinNX = 10.00;
+//const float PWMMaxPY = 20.00;
+//const float PWMMinPY = 10.00;
+//const float PWMMaxNY = 20.00;
+//const float PWMMinNY = 10.00;
+
+// Purple limbs
+
+const float PWMMaxPX = 35.00;
 const float PWMMinPX = 20.00;
-const float PWMMaxNX = 30.00;
+const float PWMMaxNX = 35.00;
 const float PWMMinNX = 20.00;
-const float PWMMaxPY = 34.00;
-const float PWMMinPY = 21.00;
-const float PWMMaxNY = 30.00;
-const float PWMMinNY = 19.00;
+const float PWMMaxPY = 35.00;
+const float PWMMinPY = 20.00;
+const float PWMMaxNY = 35.00;
+const float PWMMinNY = 20.00;
 
 const int Cool_Time = 20000;
 
