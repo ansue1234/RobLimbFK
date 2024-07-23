@@ -5,6 +5,9 @@ import sys
 from robo_limb_ml.models.fk_model import PsuedoFKModel
 from tqdm import tqdm
 
+"""
+To generate synthetic data to go through the pipeline
+"""
 
 if __name__ == "__main__":
     sys.path.append('..')

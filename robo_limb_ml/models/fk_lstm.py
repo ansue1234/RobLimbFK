@@ -8,23 +8,26 @@ class FK_LSTM(nn.LSTM):
                  hidden_size,
                  num_layers,
                  batch_first,
-                 device):
+                 output_size,
+                 device,
+                 domain_boundary=100):
         super(FK_LSTM, self).__init__(input_size,
                                       hidden_size,
                                       num_layers,
                                       batch_first=batch_first)
         self.device = device
         print("device of LSTM", self.device)
-        # self.h0 = torch.zeros(self.num_layers, input_size, self.hidden_size).to(self.device)
-        # self.c0 = torch.zeros(self.num_layers, input_size, self.hidden_size).to(self.device)
-        self.logstd = nn.Parameter(torch.tensor([0.1, 0.1]).to(self.device)).to(self.device)
-
-        self.dense_net = nn.Linear(hidden_size, 2).to(self.device)
+        self.h0 = torch.zeros(self.num_layers, input_size, self.hidden_size).to(self.device)
+        self.c0 = torch.zeros(self.num_layers, input_size, self.hidden_size).to(self.device)
+        self.logstd = nn.Parameter(torch.tensor(np.ones(output_size)*0.1).to(self.device)).to(self.device)
+        self.dense_net = nn.Linear(hidden_size, output_size).to(self.device)
+        self.boundary = domain_boundary
     
-    def forward(self, x, prob=False):
+    # Allows for stateful or stateless LTSM
+    def forward(self, x, hn, cn, prob=False):
         # out, _ = super(FK_LSTM, self).forward(x, (self.h0, self.c0))
-        out, _ = super(FK_LSTM, self).forward(x)
-        out = torch.tanh(self.dense_net(out)) * np.pi/4
+        out, (out_hn, out_cn) = super(FK_LSTM, self).forward(x, (hn, cn))
+        out = torch.tanh(self.dense_net(out)) * self.boundary
         if prob:
             distribution = torch.distributions.Normal(loc=out,
                                                       scale=torch.exp(self.logstd))
