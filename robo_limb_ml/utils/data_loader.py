@@ -38,6 +38,8 @@ class DataLoader():
         self.output_features = output_features
         self.current_batch = 0
         self.pad = pad
+        self.input_dim = len(input_features)
+        self.output_dim = len(output_features)
 
         self._calc_label()
         self._format_data()
@@ -115,5 +117,8 @@ class DataLoader():
         set_num = self.data['set_num'].values[self.current_batch*self.batch_size]
         self.current_batch += 1
         return data, labels, set_num
-
+    
+    def get_n_batches(self):
+        return self.n_batches
+ 
     

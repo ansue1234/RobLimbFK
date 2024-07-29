@@ -8,6 +8,7 @@ class FK_LSTM(nn.LSTM):
                  hidden_size,
                  num_layers,
                  batch_first,
+                 batch_size,
                  output_size,
                  device,
                  domain_boundary=100):
@@ -17,9 +18,10 @@ class FK_LSTM(nn.LSTM):
                                       batch_first=batch_first)
         self.device = device
         print("device of LSTM", self.device)
-        self.h0 = torch.zeros(self.num_layers, input_size, self.hidden_size).to(self.device)
-        self.c0 = torch.zeros(self.num_layers, input_size, self.hidden_size).to(self.device)
+        self.h0 = torch.zeros(self.num_layers, input_size, batch_size, self.hidden_size).to(self.device)
+        self.c0 = torch.zeros(self.num_layers, input_size, batch_size, self.hidden_size).to(self.device)
         self.logstd = nn.Parameter(torch.tensor(np.ones(output_size)*0.1).to(self.device)).to(self.device)
+        self.activation = nn.Tanh()
         self.dense_net = nn.Linear(hidden_size, output_size).to(self.device)
         self.boundary = domain_boundary
     
@@ -32,5 +34,5 @@ class FK_LSTM(nn.LSTM):
             distribution = torch.distributions.Normal(loc=out,
                                                       scale=torch.exp(self.logstd))
             out = distribution.rsample()
-        return out
+        return out, out_hn, out_cn
     
