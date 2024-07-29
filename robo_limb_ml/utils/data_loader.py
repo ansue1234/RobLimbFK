@@ -31,7 +31,7 @@ class DataLoader():
         self.batch_size = batch_size
         self.device = device
         self.n_samples = self.data.shape[0]
-        self.n_batches = self.n_samples // self.batch_size
+        # self.n_batches = self.n_samples // self.batch_size
         self.pred_len = predict_len
         self.seq_len = seq_len
         self.input_features = input_features
@@ -94,7 +94,7 @@ class DataLoader():
         into shape (n_samples, seq_len, n_features)
         """
         data = self.data
-        print(data.columns)
+        # print(data.columns)
         input_data = data[self.input_features]
         output_data = data[self.output_features]
         input_data = input_data.values
@@ -103,7 +103,7 @@ class DataLoader():
         self.input_data = np.array([input_data[i:i+self.seq_len] for i in range(num_sequences)])
         output_data = output_data[self.seq_len-1:]
         self.output_data = np.array([output_data[i:i+self.pred_len] for i in range(num_sequences)])
-
+        self.n_batches = self.input_data.shape[0] // self.batch_size
 
     def get_batch(self):
         if self.current_batch == self.n_batches:
@@ -112,9 +112,11 @@ class DataLoader():
         #     data = self.input_data[self.current_batch*self.batch_size:]
         #     labels = self.output_data[self.current_batch*self.batch_size:]
         # else:
+
         data = torch.tensor(self.input_data[self.current_batch*self.batch_size:(self.current_batch+1)*self.batch_size]).to(device=self.device).float()
         labels = torch.tensor(self.output_data[self.current_batch*self.batch_size:(self.current_batch+1)*self.batch_size]).to(device=self.device).float()
         set_num = self.data['set_num'].values[self.current_batch*self.batch_size]
+        # print(self.input_data.shape, self.output_data.shape)
         self.current_batch += 1
         return data, labels, set_num
     
