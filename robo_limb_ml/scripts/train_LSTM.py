@@ -147,7 +147,7 @@ if __name__ == "__main__":
             wandb.log({"val_loss": loss_evals, "epoch": epoch})
             wandb.log({"val_loss_per_batch": loss_evals/test_data_loader.get_n_batches(), "epoch": epoch})
 
-    torch.save(model.state_dict(), '../model_weights/'+experiment_name)
+    torch.save(model.state_dict(), '../model_weights/new_weights/'+experiment_name)
     # model.save_pretrained('../model_weights/' + experiment_name, use_safetensors=False)
     # model.push_to_hub("cmu-sml/FK_LSTM_" + experiment_name)
 
