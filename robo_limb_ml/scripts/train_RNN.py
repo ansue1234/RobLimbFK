@@ -72,6 +72,7 @@ if __name__ == "__main__":
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(device)
     print(args.prob_layer)
+    print(args.state)
     train_data_loader = DataLoader(file_path=args.train_data_path,
                                    batch_size=args.batch_size,
                                    device=device,
@@ -111,7 +112,7 @@ if __name__ == "__main__":
         cn = torch.zeros(num_layers, args.batch_size, hidden_size).to(device)
         hn = torch.zeros(num_layers, args.batch_size, hidden_size).to(device)
         for batch in range(train_data_loader.n_batches):
-            hn, loss, set_num = get_loss(train_data_loader, model, hn, set_num, loss_fn, optimizer, mode="train", state='stateful')
+            hn, loss, set_num = get_loss(train_data_loader, model, hn, set_num, loss_fn, optimizer, mode="train", state=args.state)
             loss_epoch += loss
         wandb.log({"loss_epoch": loss_epoch, "epoch": epoch})
         wandb.log({"Loss_epoch_per_batch": loss_epoch/train_data_loader.get_n_batches(), "epoch": epoch})
@@ -123,7 +124,7 @@ if __name__ == "__main__":
         hn = torch.zeros(num_layers, args.batch_size, hidden_size).to(device)
         with torch.no_grad():
             for batch in range(test_data_loader.n_batches):
-                hn, loss, set_num = get_loss(train_data_loader, model, hn, set_num, loss_fn, optimizer, mode="test", state='stateful')
+                hn, loss, set_num = get_loss(train_data_loader, model, hn, set_num, loss_fn, optimizer, mode="test", state=args.state)
                 loss_evals += loss
             wandb.log({"val_loss": loss_evals, "epoch": epoch})
             wandb.log({"val_loss_per_batch": loss_evals/test_data_loader.get_n_batches(), "epoch": epoch})

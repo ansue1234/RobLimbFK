@@ -23,7 +23,6 @@ parser.add_argument('--seq_len', type=int, default=50)
 parser.add_argument('--hidden_size', type=int, default=512)
 parser.add_argument('--num_layers', type=int, default=3)
 parser.add_argument('--prob_layer', type=bool, default=False)
-parser.add_argument('--state', type=str, default='stateful')
 args = parser.parse_args()
 
 
@@ -31,8 +30,8 @@ def get_loss(data_loader, model, loss_fn, optimizer, mode="train"):
     inputs, targets, _ = data_loader.get_batch()
     # flatten the inputs and targets i.e. input shape = (batch_size, seq_len, input_dim) -> (batch_size, seq_len*input_dim)
     # this is done to make the inputs and targets compatible with the MLP model
-    inputs = inputs.view(-1, inputs.shape[-1])
-    targets = targets.view(-1, targets.shape[-1])
+    inputs = inputs.view(inputs.shape[0], inputs.shape[1]*inputs.shape[2])
+    targets = targets.view(targets.shape[0], targets.shape[1]*targets.shape[2])
     if mode == 'train':
         optimizer.zero_grad()
     outputs = model(inputs, prob=args.prob_layer)

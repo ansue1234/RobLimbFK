@@ -1,8 +1,10 @@
 import torch.nn as nn
 import torch
 import numpy as np
+from huggingface_hub import PyTorchModelHubMixin
 
-class FK_LSTM(nn.LSTM):
+class FK_LSTM(nn.LSTM, 
+              PyTorchModelHubMixin):
     def __init__(self,
                  input_size,
                  hidden_size,

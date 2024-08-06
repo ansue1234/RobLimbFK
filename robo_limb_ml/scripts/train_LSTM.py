@@ -1,5 +1,6 @@
 from robo_limb_ml.models.fk_lstm import FK_LSTM
 from robo_limb_ml.utils.data_loader import DataLoader
+from huggingface_hub import metadata_update, PyTorchModelHubMixin
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -63,7 +64,8 @@ if __name__ == "__main__":
                   "hidden_size": args.hidden_size,
                   "seq_len": args.seq_len,
                   "prob": args.prob_layer,
-                  "seed": args.seed
+                  "seed": args.seed,
+                  "state": args.state
         },
         name=experiment_name
     )
@@ -74,6 +76,7 @@ if __name__ == "__main__":
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(device)
     print(args.prob_layer)
+    print(args.state)
     train_data_loader = DataLoader(file_path=args.train_data_path,
                                    batch_size=args.batch_size,
                                    device=device,
@@ -125,7 +128,7 @@ if __name__ == "__main__":
         cn = torch.zeros(num_layers, args.batch_size, hidden_size).to(device)
         hn = torch.zeros(num_layers, args.batch_size, hidden_size).to(device)
         for batch in range(train_data_loader.n_batches):
-            hn, cn, loss, set_num = get_loss(train_data_loader, model, hn, cn, set_num, loss_fn, optimizer, mode="train", state='stateful')
+            hn, cn, loss, set_num = get_loss(train_data_loader, model, hn, cn, set_num, loss_fn, optimizer, mode="train", state=args.state)
             loss_epoch += loss
             # print(f'Epoch: {epoch}, Batch: {batch}, Loss: {loss.item()}')
             # wandb.log({"loss": loss.item()})
@@ -139,12 +142,15 @@ if __name__ == "__main__":
         hn = torch.zeros(num_layers, args.batch_size, hidden_size).to(device)
         with torch.no_grad():
             for batch in range(test_data_loader.n_batches):
-                hn, cn, loss, set_num = get_loss(train_data_loader, model, hn, cn, set_num, loss_fn, optimizer, mode="test", state='stateful')
+                hn, cn, loss, set_num = get_loss(train_data_loader, model, hn, cn, set_num, loss_fn, optimizer, mode="test", state=args.state)
                 loss_evals += loss
             wandb.log({"val_loss": loss_evals, "epoch": epoch})
             wandb.log({"val_loss_per_batch": loss_evals/test_data_loader.get_n_batches(), "epoch": epoch})
 
     torch.save(model.state_dict(), '../model_weights/'+experiment_name)
+    # model.save_pretrained('../model_weights/' + experiment_name, use_safetensors=False)
+    # model.push_to_hub("cmu-sml/FK_LSTM_" + experiment_name)
+
     
 
 

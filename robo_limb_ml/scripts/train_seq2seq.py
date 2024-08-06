@@ -25,6 +25,7 @@ parser.add_argument('--num_layers', type=int, default=3)
 parser.add_argument('--prob_layer', type=bool, default=False)
 parser.add_argument('--attention', type=bool, default=False)
 parser.add_argument('--underlying_model', type=str, default='LSTM')
+parser.add_argument('--teacher_forcing_ratio', type=float, default=0.75)
 parser.add_argument('--state', type=str, default='stateful')
 args = parser.parse_args()
 
@@ -42,7 +43,7 @@ def get_loss(data_loader, model, hidden, prev_setnum, loss_fn, optimizer, mode="
         optimizer.zero_grad()
         # print(inputs.shape)
     hidden = prep_hidden(hidden, underlying_model)
-    outputs, out_hidden = model(inputs, hidden, prob=args.prob_layer)
+    outputs, out_hidden = model(inputs, targets, hidden, prob=args.prob_layer)
     loss = loss_fn(outputs, targets.detach())
     if mode == 'train':
         loss.backward()
@@ -80,6 +81,7 @@ if __name__ == "__main__":
                   "pred_len": args.predict_len,
                   "attention": args.attention,
                   "prob": args.prob_layer,
+                  "underlying_model": args.underlying_model,
                   "seed": args.seed
         },
         name=experiment_name
@@ -91,6 +93,8 @@ if __name__ == "__main__":
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(device)
     print(args.prob_layer)
+    print("underlying model", args.underlying_model)
+    print("attn", args.attention)
     train_data_loader = DataLoader(file_path=args.train_data_path,
                                    batch_size=args.batch_size,
                                    device=device,
@@ -114,7 +118,7 @@ if __name__ == "__main__":
     # print(train_data_loader.batch_size)
 
     model = FK_SEQ2SEQ(input_size=input_size,
-                       hidden_size=hidden_size,
+                       embedding_size=hidden_size,
                        num_layers=num_layers,
                        batch_size=args.batch_size,
                        output_size=output_size,
@@ -122,7 +126,9 @@ if __name__ == "__main__":
                        batch_first=True,
                        encoder_type=args.underlying_model,
                        decoder_type=args.underlying_model,
-                       attention=args.attention).to(device=device)
+                       attention=args.attention,
+                       pred_len=args.predict_len,
+                       teacher_forcing_ratio=args.teacher_forcing_ratio).to(device=device)
     optimizer = optim.Adam(model.parameters())
     loss_fn = nn.MSELoss()
     

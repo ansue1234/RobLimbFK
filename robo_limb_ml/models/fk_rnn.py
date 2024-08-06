@@ -29,7 +29,7 @@ class FK_RNN(nn.RNN):
     def forward(self, x, hn, prob=False):
         # out, _ = super(FK_LSTM, self).forward(x, (self.h0, self.c0))
         # print(x.shape)
-        out, out_hn = super(FK_RNN, self).forward(x, hn=hn)
+        out, out_hn = super(FK_RNN, self).forward(x, hn)
         out = self.dense_net(out)
         if prob:
             distribution = torch.distributions.Normal(loc=out,
