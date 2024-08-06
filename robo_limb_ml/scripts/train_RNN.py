@@ -1,4 +1,4 @@
-from robo_limb_ml.models.fk_mlp import FK_MLP
+from robo_limb_ml.models.fk_rnn import FK_RNN
 from robo_limb_ml.utils.data_loader import DataLoader
 import torch
 import torch.nn as nn
@@ -10,7 +10,7 @@ import wandb
 import time
 
 # Argument parser setup
-parser = argparse.ArgumentParser(description="Training FK_MLP model")
+parser = argparse.ArgumentParser(description="Training FK_RNN model")
 parser.add_argument('--epochs', type=int, default=200, help='Number of epochs to train the model')
 parser.add_argument('--batch_size', type=int, default=2048, help='Batch size for training')
 parser.add_argument('--num_samples', type=int, default=-1, help='Number of samples to load')
@@ -27,32 +27,33 @@ parser.add_argument('--state', type=str, default='stateful')
 args = parser.parse_args()
 
 
-def get_loss(data_loader, model, loss_fn, optimizer, mode="train"):
-    inputs, targets, _ = data_loader.get_batch()
-    # flatten the inputs and targets i.e. input shape = (batch_size, seq_len, input_dim) -> (batch_size, seq_len*input_dim)
-    # this is done to make the inputs and targets compatible with the MLP model
-    inputs = inputs.view(-1, inputs.shape[-1])
-    targets = targets.view(-1, targets.shape[-1])
+def get_loss(data_loader, model, hn, prev_setnum, loss_fn, optimizer, mode="train", state='stateful'):
+    inputs, targets, set_num = data_loader.get_batch()
     if mode == 'train':
         optimizer.zero_grad()
-    outputs = model(inputs, prob=args.prob_layer)
+        # print(inputs.shape)
+    outputs, out_hn = model(inputs, hn.detach(), prob=args.prob_layer)
     loss = loss_fn(outputs, targets.detach())
     if mode == 'train':
         loss.backward()
         optimizer.step()
     loss_batch = loss.item()
-    return loss_batch
+    if set_num != prev_setnum or state != 'stateful':
+        hn = torch.zeros(num_layers, args.batch_size, hidden_size).to(device)
+    else:
+        hn = out_hn
+    return hn, loss_batch, set_num
 
 
 if __name__ == "__main__":
     # print("Hello")
-    experiment_name = "MLP_b{}_e{}_s{}_{}_{}".format(args.batch_size, args.epochs, args.num_samples, args.exp_name, int(time.time()))
+    experiment_name = "RNN_b{}_e{}_s{}_{}_{}".format(args.batch_size, args.epochs, args.num_samples, args.exp_name, int(time.time()))
     wandb.init(
         # set the wandb project where this run will be logged
         project="RobLimbFK",
         entity="gsue",
         # track hyperparameters and run metadata
-        config = {"architecture": "MLP",
+        config = {"architecture": "RNN",
                   "num_samples": args.num_samples,
                   "batch_size": args.batch_size,
                   "epochs": args.epochs,
@@ -64,7 +65,9 @@ if __name__ == "__main__":
         },
         name=experiment_name
     )
-
+    # print("Hi")
+    # train_data_path = '../ml_data/train_data.csv'
+    # test_data_path = '../ml_data/test_data.csv'
     torch.manual_seed(args.seed)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(device)
@@ -87,11 +90,17 @@ if __name__ == "__main__":
     hidden_size = args.hidden_size
     output_size = train_data_loader.output_dim
     num_layers = args.num_layers
+    
+    # print(train_data_loader.n_samples)
+    # print(train_data_loader.batch_size)
 
-    model = FK_MLP(input_size=input_size * args.seq_len,
-                   hidden_sizes=[hidden_size, hidden_size, hidden_size],
-                   output_size=output_size * args.predict_len,
-                   device=device).to(device=device)
+    model = FK_RNN(input_size=input_size,
+                    hidden_size=hidden_size,
+                    num_layers=num_layers,
+                    batch_size=args.batch_size,
+                    output_size=output_size,
+                    device=device,
+                    batch_first=True).to(device=device)
     optimizer = optim.Adam(model.parameters())
     loss_fn = nn.MSELoss()
     
@@ -99,8 +108,10 @@ if __name__ == "__main__":
         loss_epoch = 0
         set_num = 0
         model.train()
+        cn = torch.zeros(num_layers, args.batch_size, hidden_size).to(device)
+        hn = torch.zeros(num_layers, args.batch_size, hidden_size).to(device)
         for batch in range(train_data_loader.n_batches):
-            loss = get_loss(train_data_loader, model, loss_fn, optimizer, mode="train")
+            hn, loss, set_num = get_loss(train_data_loader, model, hn, set_num, loss_fn, optimizer, mode="train", state='stateful')
             loss_epoch += loss
         wandb.log({"loss_epoch": loss_epoch, "epoch": epoch})
         wandb.log({"Loss_epoch_per_batch": loss_epoch/train_data_loader.get_n_batches(), "epoch": epoch})
@@ -108,9 +119,11 @@ if __name__ == "__main__":
         loss_evals = 0
         eval_set_n = 0
         model.eval()
+        cn = torch.zeros(num_layers, args.batch_size, hidden_size).to(device)
+        hn = torch.zeros(num_layers, args.batch_size, hidden_size).to(device)
         with torch.no_grad():
             for batch in range(test_data_loader.n_batches):
-                loss = get_loss(train_data_loader, model, loss_fn, optimizer, mode="test")
+                hn, loss, set_num = get_loss(train_data_loader, model, hn, set_num, loss_fn, optimizer, mode="test", state='stateful')
                 loss_evals += loss
             wandb.log({"val_loss": loss_evals, "epoch": epoch})
             wandb.log({"val_loss_per_batch": loss_evals/test_data_loader.get_n_batches(), "epoch": epoch})

@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import numpy as np
+import torch
 
 
 class SEQ2SEQ_Encoder(nn.Module):
@@ -28,9 +29,9 @@ class SEQ2SEQ_Encoder(nn.Module):
         if encoder_type == "LSTM":
             self.encoder.c0 = torch.zeros(num_layers, batch_size, embedding_size).to(self.device)
     
-    def forward(self, hn, cn, x):
-        out, (out_hn, out_cn) = self.encoder(x, (hn, cn))
-        return out, out_hn, out_cn
+    def forward(self, hidden, x):
+        out, hidden = self.encoder(x, hidden)
+        return out, hidden
 
 class SEQ2SEQ_Decoder(nn.Module):
     def __init__(self,
@@ -41,7 +42,8 @@ class SEQ2SEQ_Decoder(nn.Module):
                  batch_first,
                  batch_size,
                  device,
-                 decoder_type="LSTM"):
+                 decoder_type="LSTM",
+                 attention=False):
         super(SEQ2SEQ_Decoder, self).__init__()
         self.decoder = nn.LSTM(input_size,
                                embedding_size,
@@ -53,16 +55,21 @@ class SEQ2SEQ_Decoder(nn.Module):
                                                                                     batch_first=batch_first,
                                                                                     device=device)
         self.fc = nn.Linear(embedding_size, output_size).to(device)
+        self.attention = attention
+        if attention:
+            self.attention_layer = nn.MultiheadAttention(embedding_size, 3, batch_first=True, is_causal=True, device=device).to(device)
         self.device = device
         print("device of SEQ2SEQ_decoder", self.device)
         self.decoder.h0 = torch.zeros(num_layers, batch_size, embedding_size).to(self.device)
         if decoder_type == "LSTM":
             self.decoder.c0 = torch.zeros(num_layers, batch_size, embedding_size).to(self.device)
     
-    def forward(self, hn, cn, x, encoder_out):
-        out, (out_hn, out_cn) = self.decoder(x, (hn, cn))
+    def forward(self, hidden, x, encoder_out):
+        if self.attention:
+            x, _ = self.attention_layer(x, encoder_out, encoder_out)
+        out, hidden = self.decoder(x, hidden)
         out = self.fc(out)
-        return out, out_hn, out_cn
+        return out, hidden
         
 
 class FK_SEQ2SEQ(nn.Module):
@@ -77,7 +84,8 @@ class FK_SEQ2SEQ(nn.Module):
                  encoder_type="LSTM",
                  decoder_type="LSTM",
                  domain_boundary=100,
-                 pred_len=10):
+                 pred_len=10,
+                 attention=False):
         super(FK_SEQ2SEQ, self).__init__()
         self.encoder = SEQ2SEQ_Encoder(input_size,
                                         embedding_size,
@@ -93,7 +101,8 @@ class FK_SEQ2SEQ(nn.Module):
                                         batch_first,
                                         batch_size,
                                         device,
-                                        decoder_type)
+                                        decoder_type,
+                                        attention)
         self.device = device
         print("device of SEQ2SEQ", self.device)
         self.logstd = nn.Parameter(torch.tensor(np.ones(output_size)*0.1).to(self.device)).to(self.device)
@@ -102,13 +111,13 @@ class FK_SEQ2SEQ(nn.Module):
         self.boundary = domain_boundary
     
     # Allows for stateful or stateless LTSM
-    def forward(self, x, gnd_truth, hn, cn, prob=False, teacher_forcing_prob=0.5):
-        encoder_out, encoder_hn, encoder_cn = self.encoder(hn, cn, x)
+    def forward(self, x, gnd_truth, hidden, prob=False, teacher_forcing_prob=0.5):
+        encoder_out, encoder_hidden = self.encoder(hidden, x)
         decoder_input = x[:, -1:, :]
         outputs = [None for _ in range(self.pred_len)]
-        decoder_hn, decoder_cn = encoder_hn, encoder_cn
+        decoder_hidden = encoder_hidden
         for i in range(self.pred_len):
-            decoder_out, decoder_hn, decoder_cn = self.decoder(decoder_hn, decoder_cn, decoder_input, encoder_out)
+            decoder_out, decoder_hidden = self.decoder(decoder_hidden, decoder_input, encoder_out)
             if prob:
                 distribution = torch.distributions.Normal(loc=decoder_out,
                                                         scale=torch.exp(self.logstd))
@@ -120,4 +129,4 @@ class FK_SEQ2SEQ(nn.Module):
             else:
                 decoder_input = decoder_out
         out = torch.cat(outputs, dim=1)
-        return out, encoder_hn, encoder_cn
+        return out, encoder_hidden
