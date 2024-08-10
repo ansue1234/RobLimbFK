@@ -20,7 +20,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'bridge = arduino_bridge.bridge:main'
+            'bridge = arduino_bridge.bridge:main',
+            'teleop = arduino_bridge.teleop:main'
         ],
     },
 )

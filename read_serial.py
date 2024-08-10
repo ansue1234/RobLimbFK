@@ -22,15 +22,17 @@ def readserial(comport, baudrate):
     ser = serial.Serial(comport, baudrate, timeout=0.1)         # 1/timeout is the frequency at which the port is read
     start = False
     while True:
-        data = ser.readline().decode(encoding='latin1').strip()
-        print('Data' in data)
-        try: 
-            x = data.split(',')[1]
-            y = data.split(',')[2]
-            print('x:', float(x), 'y:', float(y))
-        except:
-            pass
-        
+        data = ser.readline().decode(encoding='utf-8').strip()
+        # print('Data' in data)
+        # try: 
+        #     x = data.split(',')[1]
+        #     y = data.split(',')[2]
+        #     print('x:', float(x), 'y:', float(y))
+            
+        # except:
+        #     pass
+        print(data)
+        ser.write("Hi\n".encode('utf-8'))
         # if data:
         #     if "Complete" in data:
         #         start = True

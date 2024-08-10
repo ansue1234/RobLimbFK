@@ -63,33 +63,33 @@ def main():
                     throttle_msg.throttle_x = 0.0
                     throttle_msg.throttle_y = 0.5
                 elif key == 'a':
-                    throttle_msg.throttle_x = 0.0
-                    throttle_msg.throttle_y = 0.5
+                    throttle_msg.throttle_x = -0.5
+                    throttle_msg.throttle_y = 0.0
                 elif key == 's':
                     throttle_msg.throttle_x = 0.0
-                    throttle_msg.throttle_y = 0.5
+                    throttle_msg.throttle_y = -0.5
                 elif key == 'd':
-                    throttle_msg.throttle_x = 0.0
-                    throttle_msg.throttle_y = 0.5
+                    throttle_msg.throttle_x = 0.5
+                    throttle_msg.throttle_y = 0.0
                 elif key == 'q':
-                    throttle_msg.throttle_x = 0.0
+                    throttle_msg.throttle_x = -0.5
                     throttle_msg.throttle_y = 0.5
                 elif key == 'e':
-                    throttle_msg.throttle_x = 0.0
+                    throttle_msg.throttle_x = 0.5
                     throttle_msg.throttle_y = 0.5
                 elif key == 'z':
-                    throttle_msg.throttle_x = 0.0
-                    throttle_msg.throttle_y = 0.5
+                    throttle_msg.throttle_x = -0.5
+                    throttle_msg.throttle_y = -0.5
                 elif key == 'x':
-                    throttle_msg.throttle_x = 0.0
-                    throttle_msg.throttle_y = 0.5
-
+                    throttle_msg.throttle_x = 0.5
+                    throttle_msg.throttle_y = -0.5
             else:
                 throttle_msg.throttle_x = 0.0
                 throttle_msg.throttle_y = 0.0
                 if (key == '\x03'):
                     break
             pub.publish(throttle_msg)
+
 
     except Exception as e:
         print(e)
