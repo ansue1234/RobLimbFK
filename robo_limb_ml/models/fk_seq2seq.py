@@ -120,7 +120,7 @@ class FK_SEQ2SEQ(nn.Module):
         self.force_ratio = teacher_forcing_ratio
     
     # Allows for stateful or stateless LTSM
-    def forward(self, x, gnd_truth, hidden, prob=False):
+    def forward(self, x, gnd_truth, hidden, prob=False, mode='train'):
         # print("main forward", x.shape)
         encoder_out, encoder_hidden = self.encoder(x, hidden)
         decoder_input = x[:, -1:, :]
@@ -134,7 +134,7 @@ class FK_SEQ2SEQ(nn.Module):
                 decoder_out = distribution.rsample().float()
             decoder_out = torch.tanh(decoder_out) * self.boundary
             outputs[i] = decoder_out
-            if np.random.random() < self.force_ratio:
+            if np.random.random() < self.force_ratio and mode == 'train':
                 decoder_input = gnd_truth[:, i:i+1, :]
             else:
                 # add velocities

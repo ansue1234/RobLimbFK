@@ -43,7 +43,7 @@ def get_loss(data_loader, model, hidden, prev_setnum, loss_fn, optimizer, mode="
         optimizer.zero_grad()
         # print(inputs.shape)
     hidden = prep_hidden(hidden, underlying_model)
-    outputs, out_hidden = model(inputs, targets, hidden, prob=args.prob_layer)
+    outputs, out_hidden = model(inputs, targets, hidden, prob=args.prob_layer, mode=mode)
     loss = loss_fn(outputs, targets.detach())
     if mode == 'train':
         loss.backward()
