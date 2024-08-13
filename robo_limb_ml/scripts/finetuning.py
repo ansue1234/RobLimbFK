@@ -126,17 +126,18 @@ if __name__ == "__main__":
                         batch_first=True).to(device=device)
     else:
         model = FK_SEQ2SEQ(input_size=input_size,
-                        embedding_size=hidden_size,
-                        num_layers=num_layers,
-                        batch_size=args.batch_size,
-                        output_size=output_size,
-                        device=device,
-                        batch_first=True,
-                        encoder_type='LSTM',
-                        decoder_type='LSTM',
-                        attention=args.attention,
-                        pred_len=args.predict_len,
-                        teacher_forcing_ratio=args.teacher_forcing_ratio).to(device=device)
+                           embedding_size=hidden_size,
+                           num_layers=num_layers,
+                           batch_size=args.batch_size,
+                           output_size=output_size,
+                           device=device,
+                           batch_first=True,
+                           encoder_type='LSTM',
+                           decoder_type='LSTM',
+                           attention=args.attention,
+                           pred_len=args.predict_len,
+                           teacher_forcing_ratio=args.teacher_forcing_ratio).to(device=device)
+    model.load_state_dict(torch.load(args.model_path, map_location=device))
     optimizer = optim.Adam(model.parameters())
     loss_fn = nn.MSELoss()
     
