@@ -115,7 +115,7 @@ if __name__ == "__main__":
             obs, next_obs, action, rewards, dones = data_loader.get_data(args.shuffle)
             with torch.no_grad():
                 target_max, _ = target_network(next_obs).max(dim=1)
-                td_target = rewards + args.gamma * target_max * (1 - dones)
+                td_target = rewards + args.gamma * target_max
             old_val = q_network(obs).gather(1, data_loader.get_action(action)).squeeze()
             loss = F.mse_loss(td_target, old_val)
             
