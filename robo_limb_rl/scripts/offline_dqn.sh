@@ -4,8 +4,8 @@ python offline_dqn.py \
        --track \
        --wandb-project-name soft_limb \
        --total-timesteps 500000 \
-       --target-network-frequency 10 \
-       --train-frequency 1 \
+       --target-network-frequency 500 \
+       --train-frequency 10 \
        --batch-size 512 \
        --network-type LSTM \
        --state-path ../safe_rl_data/states_len10_no_action.npy \
@@ -19,8 +19,8 @@ python offline_dqn.py \
        --track \
        --wandb-project-name soft_limb \
        --total-timesteps 500000 \
-       --target-network-frequency 10 \
-       --train-frequency 1 \
+       --target-network-frequency 500 \
+       --train-frequency 10 \
        --batch-size 512 \
        --network-type LSTM \
        --state-path ../safe_rl_data/states_len10_no_action.npy \
@@ -35,8 +35,8 @@ python offline_dqn.py \
        --track \
        --wandb-project-name soft_limb \
        --total-timesteps 500000 \
-       --target-network-frequency 10 \
-       --train-frequency 1 \
+       --target-network-frequency 500 \
+       --train-frequency 10 \
        --batch-size 512 \
        --network-type LSTM \
        --state-path ../safe_rl_data/states_len10.npy \
@@ -51,8 +51,8 @@ python offline_dqn.py \
        --track \
        --wandb-project-name soft_limb \
        --total-timesteps 500000 \
-       --target-network-frequency 10 \
-       --train-frequency 1 \
+       --target-network-frequency 500 \
+       --train-frequency 10 \
        --batch-size 512 \
        --network-type LSTM \
        --state-path ../safe_rl_data/states_len10.npy \
@@ -67,8 +67,8 @@ python offline_dqn.py \
        --track \
        --wandb-project-name soft_limb \
        --total-timesteps 500000 \
-       --target-network-frequency 10 \
-       --train-frequency 1 \
+       --target-network-frequency 500 \
+       --train-frequency 10 \
        --batch-size 512 \
        --network-type LSTM \
        --state-path ../safe_rl_data/states_len10_no_action.npy \
@@ -82,8 +82,8 @@ python offline_dqn.py \
        --track \
        --wandb-project-name soft_limb \
        --total-timesteps 500000 \
-       --target-network-frequency 10 \
-       --train-frequency 1 \
+       --target-network-frequency 500 \
+       --train-frequency 10 \
        --batch-size 512 \
        --network-type LSTM \
        --state-path ../safe_rl_data/states_len10_no_action.npy \
@@ -98,8 +98,8 @@ python offline_dqn.py \
        --track \
        --wandb-project-name soft_limb \
        --total-timesteps 500000 \
-       --target-network-frequency 10 \
-       --train-frequency 1 \
+       --target-network-frequency 500 \
+       --train-frequency 10 \
        --batch-size 512 \
        --network-type LSTM \
        --state-path ../safe_rl_data/states_len10.npy \
@@ -114,8 +114,8 @@ python offline_dqn.py \
        --track \
        --wandb-project-name soft_limb \
        --total-timesteps 500000 \
-       --target-network-frequency 10 \
-       --train-frequency 1 \
+       --target-network-frequency 500 \
+       --train-frequency 10 \
        --batch-size 512 \
        --network-type LSTM \
        --state-path ../safe_rl_data/states_len10.npy \
@@ -130,8 +130,8 @@ python offline_dqn.py \
        --track \
        --wandb-project-name soft_limb \
        --total-timesteps 500000 \
-       --target-network-frequency 10 \
-       --train-frequency 1 \
+       --target-network-frequency 500 \
+       --train-frequency 10 \
        --batch-size 512 \
        --network-type LSTM \
        --state-path ../safe_rl_data/states_len10_no_action.npy \
@@ -145,8 +145,8 @@ python offline_dqn.py \
        --track \
        --wandb-project-name soft_limb \
        --total-timesteps 500000 \
-       --target-network-frequency 10 \
-       --train-frequency 1 \
+       --target-network-frequency 500 \
+       --train-frequency 10 \
        --batch-size 512 \
        --network-type LSTM \
        --state-path ../safe_rl_data/states_len10_no_action.npy \
@@ -161,8 +161,8 @@ python offline_dqn.py \
        --track \
        --wandb-project-name soft_limb \
        --total-timesteps 500000 \
-       --target-network-frequency 10 \
-       --train-frequency 1 \
+       --target-network-frequency 500 \
+       --train-frequency 10 \
        --batch-size 512 \
        --network-type LSTM \
        --state-path ../safe_rl_data/states_len10.npy \
@@ -177,8 +177,8 @@ python offline_dqn.py \
        --track \
        --wandb-project-name soft_limb \
        --total-timesteps 500000 \
-       --target-network-frequency 10 \
-       --train-frequency 1 \
+       --target-network-frequency 500 \
+       --train-frequency 10 \
        --batch-size 512 \
        --network-type LSTM \
        --state-path ../safe_rl_data/states_len10.npy \
