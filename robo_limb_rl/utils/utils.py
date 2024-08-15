@@ -9,14 +9,16 @@ class DataLoader():
                  reward_path,
                  num_throttle_actions,
                  batch_size,
-                 device):
+                 device,
+                 shuffle=True):
         
         self.device = device
         self.batch_size = batch_size
-        self.state = np.load(state_path)
-        self.next_state = np.load(next_state_path)
-        self.actions = np.load(action_path)
-        self.rewards = np.load(reward_path)
+        self.shuffle = shuffle
+        self.state = np.load(state_path).astype(np.float32)
+        self.next_state = np.load(next_state_path).astype(np.float32)
+        self.actions = np.load(action_path).astype(np.float32)
+        self.rewards = np.load(reward_path).astype(np.float32)
         
         self.num_samples = self.state.shape[0]
         self.seq_len = self.state.shape[1]
@@ -26,8 +28,15 @@ class DataLoader():
         self.current_batch = 0
         self.n_batches = self.num_samples // self.batch_size
         
-    def get_data(self, shuffle=True):
-        if not shuffle:
+        if not self.shuffle:
+            self.num_samples = (self.state.shape[0]//self.batch_size)*self.batch_size
+            self.state = self.state[:self.num_samples]
+            self.next_state = self.next_state[:self.num_samples]
+            self.actions = self.actions[:self.num_samples]
+            self.rewards = self.rewards[:self.num_samples]
+            
+    def get_data(self):
+        if not self.shuffle:
             if self.current_batch == self.n_batches:
                 self.current_batch = 0
             
@@ -38,7 +47,7 @@ class DataLoader():
                         torch.tensor(self.next_state[self.current_batch*self.batch_size:]).to(self.device),\
                         torch.tensor(self.actions[self.current_batch*self.batch_size:]).to(self.device),\
                         torch.tensor(rewards).to(self.device), \
-                        torch.tensor(dones).to(self.device)
+                        torch.tensor(dones).to(self.device), self.current_batch + 1 == self.n_batches
             else:
                 rewards = self.rewards[self.current_batch*self.batch_size:(self.current_batch + 1)*self.batch_size]
                 dones = rewards <= 0
@@ -46,16 +55,16 @@ class DataLoader():
                         torch.tensor(self.next_state[self.current_batch*self.batch_size:(self.current_batch + 1)*self.batch_size]).to(self.device),\
                         torch.tensor(self.actions[self.current_batch*self.batch_size:(self.current_batch + 1)*self.batch_size]).to(self.device),\
                         torch.tensor(rewards).to(self.device), \
-                        torch.tensor(dones).to(self.device)
+                        torch.tensor(dones).to(self.device), self.current_batch + 1 == self.n_batches
         else:
-            index = np.randomInt(0, len(self.state) - self.batch_size)
+            index = np.random.randint(0, len(self.state) - self.batch_size)
             rewards = self.rewards[index:index+self.batch_size]
             dones = rewards <= 0
-            return torch.tensor(self.state[index:index+self.batch_size]).to(self.device),\
+            return torch.tensor(self.state[index:index+self.batch_size], ).to(self.device),\
                     torch.tensor(self.next_state[index:index+self.batch_size]).to(self.device),\
                     torch.tensor(self.actions[index:index+self.batch_size]).to(self.device),\
                     torch.tensor(rewards).to(self.device), \
-                    torch.tensor(dones).to(self.device)
+                    torch.tensor(dones).to(self.device), self.current_batch + 1 == self.n_batches
     
     def get_dims(self):
         return self.obs_space, self.action_space
