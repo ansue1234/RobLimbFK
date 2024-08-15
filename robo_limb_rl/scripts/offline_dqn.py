@@ -35,8 +35,6 @@ class Args:
     save_model: bool = False
     """whether to save model into the `runs/{run_name}` folder"""
     # Algorithm specific arguments
-    env_id: str = "CartPole-v1"
-    """the id of the environment"""
     total_timesteps: int = 500000
     """total timesteps of the experiments"""
     learning_rate: float = 2.5e-4
