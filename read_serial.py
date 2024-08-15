@@ -1,6 +1,6 @@
 import serial
 # import matplotlib.pyplot as plt
-import numpy as np
+# import numpy as np
 
 def readserial(comport, baudrate):
 
@@ -24,6 +24,13 @@ def readserial(comport, baudrate):
     while True:
         data = ser.readline().decode(encoding='latin1').strip()
         print(data)
+        # try: 
+        #     x = data.split(',')[1]
+        #     y = data.split(',')[2]
+        #     print('x:', float(x), 'y:', float(y))
+        # except:
+        #     pass
+        
         # if data:
         #     if "Complete" in data:
         #         start = True

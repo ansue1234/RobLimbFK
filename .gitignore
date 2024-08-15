@@ -6,3 +6,7 @@
 *wandb*
 */data/
 */model_weights/old_weights/
+*/build/
+*/install/
+*/log/
+*runs*
