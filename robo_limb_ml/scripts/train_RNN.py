@@ -24,6 +24,7 @@ parser.add_argument('--hidden_size', type=int, default=512)
 parser.add_argument('--num_layers', type=int, default=3)
 parser.add_argument('--prob_layer', type=bool, default=False)
 parser.add_argument('--state', type=str, default='stateful')
+parser.add_argument('--tag', type=str, default='debugging')
 args = parser.parse_args()
 
 
@@ -63,7 +64,8 @@ if __name__ == "__main__":
                   "prob": args.prob_layer,
                   "seed": args.seed
         },
-        name=experiment_name
+        name=experiment_name,
+        tags=[args.tag]
     )
     # print("Hi")
     # train_data_path = '../ml_data/train_data.csv'

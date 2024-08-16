@@ -29,6 +29,7 @@ parser.add_argument('--prob_layer', type=bool, default=False)
 parser.add_argument('--attention', type=bool, default=False)
 parser.add_argument('--teacher_forcing_ratio', type=float, default=0.75)
 parser.add_argument('--state', type=str, default='stateful')
+parser.add_argument('--tag', type=str, default='debugging')
 args = parser.parse_args()
 
 
@@ -43,7 +44,7 @@ def get_loss(data_loader, model, hidden, prev_setnum, loss_fn, optimizer, mode="
         # print(inputs.shape)
     hidden = prep_hidden(hidden)
     if model_type == 'LSTM':
-        outputs, out_hn, out_cn = model(inputs, hidden[0], hidden[1], prob=args.prob_layer, mode=mode)
+        outputs, out_hn, out_cn = model(inputs, hidden[0], hidden[1], prob=args.prob_layer)
         out_hidden = (out_hn, out_cn)
     else:
         outputs, out_hidden = model(inputs, targets, hidden, prob=args.prob_layer, mode=mode)
@@ -81,10 +82,11 @@ if __name__ == "__main__":
                   "pred_len": args.predict_len,
                   "attention": args.attention,
                   "prob": args.prob_layer,
-                  "model_type": args.underlying_model,
+                  "model_type": args.model_type,
                   "seed": args.seed
         },
-        name=experiment_name
+        name=experiment_name,
+        tags=[args.tag]
     )
     # print("Hi")
     # train_data_path = '../ml_data/train_data.csv'
@@ -148,9 +150,8 @@ if __name__ == "__main__":
         cn = torch.zeros(num_layers, args.batch_size, hidden_size).to(device)
         hn = torch.zeros(num_layers, args.batch_size, hidden_size).to(device)
         hidden = (hn, cn)
-
         for batch in range(train_data_loader.n_batches):
-            hidden, loss, set_num = get_loss(train_data_loader, model, hidden, set_num, loss_fn, optimizer, mode="train", state='stateful', underlying_model=args.underlying_model)
+            hidden, loss, set_num = get_loss(train_data_loader, model, hidden, set_num, loss_fn, optimizer, mode="train", state='stateful', model_type=args.model_type)
             loss_epoch += loss
         wandb.log({"loss_epoch": loss_epoch, "epoch": epoch})
         wandb.log({"Loss_epoch_per_batch": loss_epoch/train_data_loader.get_n_batches(), "epoch": epoch})
@@ -163,11 +164,10 @@ if __name__ == "__main__":
         hidden = (hn, cn)
         with torch.no_grad():
             for batch in range(test_data_loader.n_batches):
-                hidden, loss, set_num = get_loss(train_data_loader, model, hidden, set_num, loss_fn, optimizer, mode="test", state='stateful', underlying_model=args.underlying_model)
+                hidden, loss, set_num = get_loss(train_data_loader, model, hidden, set_num, loss_fn, optimizer, mode="test", state='stateful', model_type=args.model_type)
                 loss_evals += loss
             wandb.log({"val_loss": loss_evals, "epoch": epoch})
             wandb.log({"val_loss_per_batch": loss_evals/test_data_loader.get_n_batches(), "epoch": epoch})
-
     torch.save(model.state_dict(), '../model_weights/new_weights/'+experiment_name)
     
 
