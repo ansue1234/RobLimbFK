@@ -16,3 +16,8 @@
 - Files are just pointers to LFS
   - `git lfs fetch`
   - `git lfs pull`
+
+# Create dataset
+- move file into `data/raw_data`
+- run `notebooks/data_cleaning.ipynb`
+- 
