@@ -1,6 +1,5 @@
 from robo_limb_ml.models.fk_lstm import FK_LSTM
 from robo_limb_ml.utils.data_loader import DataLoader
-from huggingface_hub import metadata_update, PyTorchModelHubMixin
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -25,6 +24,7 @@ parser.add_argument('--hidden_size', type=int, default=512)
 parser.add_argument('--num_layers', type=int, default=3)
 parser.add_argument('--prob_layer', type=bool, default=False)
 parser.add_argument('--state', type=str, default='stateful')
+parser.add_argument('--tag', type=str, default='debugging')
 args = parser.parse_args()
 
 
@@ -67,7 +67,8 @@ if __name__ == "__main__":
                   "seed": args.seed,
                   "state": args.state
         },
-        name=experiment_name
+        name=experiment_name,
+        tags=[args.tag]
     )
     # print("Hi")
     # train_data_path = '../ml_data/train_data.csv'

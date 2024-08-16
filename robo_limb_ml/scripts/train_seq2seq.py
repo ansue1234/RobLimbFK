@@ -27,6 +27,7 @@ parser.add_argument('--attention', type=bool, default=False)
 parser.add_argument('--underlying_model', type=str, default='LSTM')
 parser.add_argument('--teacher_forcing_ratio', type=float, default=0.75)
 parser.add_argument('--state', type=str, default='stateful')
+parser.add_argument('--tag', type=str, default='debugging')
 args = parser.parse_args()
 
 
@@ -84,7 +85,8 @@ if __name__ == "__main__":
                   "underlying_model": args.underlying_model,
                   "seed": args.seed
         },
-        name=experiment_name
+        name=experiment_name,
+        tags=[args.tag]
     )
     # print("Hi")
     # train_data_path = '../ml_data/train_data.csv'
