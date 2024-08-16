@@ -6,14 +6,7 @@
 *wandb*
 */data/
 */model_weights/old_weights/
-/videos/
-.vscode/
-*__pycache__*
-*.egg-info/
-/build/
-*wandb*
-*/data/
-*/model_weights/
 */build/
 */install/
 */log/
+*runs*

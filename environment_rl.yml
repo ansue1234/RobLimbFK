@@ -1,4 +1,4 @@
-name: soft_limb_ml
+name: soft_limb_rl
 channels:
   - defaults
 dependencies:
