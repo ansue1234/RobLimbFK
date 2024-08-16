@@ -51,13 +51,13 @@ const int max_state = 100; //Boundary of state space
 
 // Purple limbs
 
-const float PWMMaxPX = 35.00;
+const float PWMMaxPX = 40.00;
 const float PWMMinPX = 20.00;
-const float PWMMaxNX = 35.00;
+const float PWMMaxNX = 40.00;
 const float PWMMinNX = 20.00;
-const float PWMMaxPY = 35.00;
+const float PWMMaxPY = 40.00;
 const float PWMMinPY = 20.00;
-const float PWMMaxNY = 35.00;
+const float PWMMaxNY = 40.00;
 const float PWMMinNY = 20.00;
 
 const int Cool_Time = 20000;
