@@ -25,6 +25,8 @@ parser.add_argument('--num_layers', type=int, default=3)
 parser.add_argument('--prob_layer', type=bool, default=False)
 parser.add_argument('--state', type=str, default='stateful')
 parser.add_argument('--tag', type=str, default='debugging')
+parser.add_argument('--vel', type=bool, default=False)
+parser.add_argument('--no_time', type=bool, default=False)
 args = parser.parse_args()
 
 
@@ -50,7 +52,7 @@ def get_loss(data_loader, model, hn, cn, prev_setnum, loss_fn, optimizer, mode="
 
 if __name__ == "__main__":
     # print("Hello")
-    experiment_name = "LSTM_b{}_e{}_s{}_{}_{}".format(args.batch_size, args.epochs, args.num_samples, args.exp_name, int(time.time()))
+    experiment_name = "LSTM_b{}_e{}_s{}_len{}_{}_{}".format(args.batch_size, args.epochs, args.num_samples, args.seq_len, args.exp_name, int(time.time()))
     wandb.init(
         # set the wandb project where this run will be logged
         project="RobLimbFK",
@@ -78,18 +80,35 @@ if __name__ == "__main__":
     print(device)
     print(args.prob_layer)
     print(args.state)
+    input_features = ['time_begin',
+                      'time_begin_traj',
+                      'theta_x',
+                      'theta_y',
+                      'vel_x',
+                      'vel_y',
+                      'X_throttle',
+                      'Y_throttle'] 
+    if args.no_time:
+        input_features.remove('time_begin')
+        input_features.remove('time_begin_traj')
+    if not args.vel:
+        input_features.remove('vel_x')
+        input_features.remove('vel_y')
+        
     train_data_loader = DataLoader(file_path=args.train_data_path,
                                    batch_size=args.batch_size,
                                    device=device,
                                    predict_len=args.predict_len,
                                    seq_len=args.seq_len,
                                    num_samples=args.num_samples,
+                                   input_features=input_features,
                                    pad=True)
     test_data_loader = DataLoader(file_path=args.test_data_path,
                                   batch_size=args.batch_size,
                                   device=device,
                                   predict_len=args.predict_len,
                                   num_samples=-1,
+                                  input_features=input_features,
                                   seq_len=args.seq_len,
                                   pad=True)
     input_size = train_data_loader.input_dim

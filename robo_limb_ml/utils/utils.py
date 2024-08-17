@@ -1,6 +1,15 @@
 import numpy as np
 import pandas as pd
 import os
+import torch
+import torch.nn as nn
+import matplotlib.pyplot as plt
+from robo_limb_ml.models.fk_lstm import FK_LSTM
+from robo_limb_ml.models.fk_mlp import FK_MLP
+from robo_limb_ml.models.fk_rnn import FK_RNN
+from robo_limb_ml.models.fk_seq2seq import FK_SEQ2SEQ
+from tqdm import tqdm
+from torcheval.metrics import R2Score
 
 def get_velocities(data):
     """
@@ -49,3 +58,114 @@ def concat_data(directory, vel=False):
         dfs.append(data)
     data = pd.concat(dfs, ignore_index=True)
     return data
+
+def rollout(model_path,
+            test_data_path,
+            input_size,
+            hidden_size,
+            num_layers,
+            batch_size,
+            output_size,
+            device):
+    model_path_lower = model_path.lower()
+    model_type = 'SEQ2SEQ' if 'seq2' in model_path_lower else 'LSTM'
+    attention = True if 'attention' in model_path_lower else False
+    stateful = False if 'stateless' in model_path_lower else False
+    seq_len = 10 if 'len10' in model_path_lower else 50
+    vel = True if 'vel' in model_path_lower else False
+    
+    if model_type == 'LSTM':
+        model = FK_LSTM(input_size=input_size,
+                hidden_size=hidden_size,
+                num_layers=num_layers,
+                batch_size=batch_size,
+                output_size=output_size,
+                device=device,
+                batch_first=True).to(device=device)
+        model.load_state_dict(torch.load(model_path, map_location=device))
+        model.h0 = torch.zeros(num_layers, 1, hidden_size).to(device=device)
+        model.c0 = torch.zeros(num_layers, 1, hidden_size).to(device=device)
+    elif model_type == 'SEQ2SEQ':
+        model = FK_SEQ2SEQ(input_size=input_size,
+                   embedding_size=hidden_size,
+                   num_layers=num_layers,
+                   batch_size=batch_size,
+                   output_size=output_size,
+                   device=device,
+                   batch_first=True,
+                   encoder_type='LSTM',
+                   decoder_type='LSTM',
+                   attention=attention,
+                   pred_len=1,
+                   teacher_forcing_ratio=0.0).to(device=device)
+        model.load_state_dict(torch.load(model_path, map_location=device))
+        model.eval()
+    
+    test_df = pd.read_csv(test_data_path).dropna()
+    col_1 = test_df.pop('vel_x')
+    test_df.insert(7, col_1.name, col_1)
+    col_2 = test_df.pop('vel_y')
+    test_df.insert(7, col_2.name, col_2)
+    
+    test_tensor = torch.tensor(test_df.values.copy(), dtype=torch.float32).to(device=device)
+    # obs_tensor = torch.tensor(test_df.drop(columns=["vel_x", "vel_y"]).values, dtype=torch.float32).to(device=device)
+    outputs = torch.zeros(test_df.shape).to(device=device)
+    outputs[:seq_len] = test_tensor[:seq_len].clone()
+    hn = torch.zeros(num_layers, 1, hidden_size).to(device=device)
+    cn = torch.zeros(num_layers, 1, hidden_size).to(device=device)
+    hidden = (hn, cn)
+    with torch.no_grad():
+        for i in tqdm(range(seq_len, test_df.shape[0])):
+            if vel:
+                data = outputs[i - seq_len:i]
+            else:
+                data = outputs[i - seq_len:i, :-2]
+            time_begin, time_begin_traj, theta_x, theta_y, X_throttle, Y_throttle, vel_x, vel_y  = test_tensor[i - 1]
+            if stateful:
+                if model_type == 'LSTM':
+                    delta_states, hn, cn = model(data.unsqueeze(0), hn, cn)
+                elif model_type == 'SEQ2SEQ':
+                    delta_states, hidden = model(data.unsqueeze(0), None, hidden, mode='test')
+            else:
+                if model_type == 'LSTM':
+                    delta_states, _, _ = model(data.unsqueeze(0), hn, cn)
+                else:
+                    delta_states, _ = model(data.unsqueeze(0), None, hidden, mode='test')
+            delta_states = delta_states.squeeze()
+            time_begin_1, time_begin_traj_1, _, _, X_throttle_1, Y_throttle_1, _, _ = test_tensor[i]
+            pred_theta_x, pred_theta_y, pred_vel_x, pred_vel_y = delta_states[0] + theta_x, delta_states[1] + theta_y, delta_states[2] + vel_x, delta_states[3] + vel_y
+            outputs[i] = torch.tensor([time_begin_1, time_begin_traj_1, pred_theta_x, pred_theta_y, X_throttle_1, Y_throttle_1, pred_vel_x, pred_vel_y]).to(device=device)
+            
+    outputs_df = pd.DataFrame(outputs.cpu().detach().numpy(), columns=test_df.columns)
+    output_states = torch.tensor(outputs_df[['theta_x', 'theta_y', 'vel_x', 'vel_y']].values, dtype=torch.float32).to(device=device)
+    test_states = torch.tensor(test_df[['theta_x', 'theta_y', 'vel_x', 'vel_y']].values, dtype=torch.float32).to(device=device)
+    
+    metric = R2Score()
+    metric.update(test_states, output_states)
+    r2_score = metric.compute()
+    print("R^2", r2_score.item())
+    rmse = torch.sqrt(nn.MSELoss()(test_states, output_states))
+    print("RMSE", rmse.item())
+    
+    return outputs_df, test_df, r2_score, rmse
+
+def viz_graph(outputs_df, test_df, run_name, display_window=1500):
+    fig, axs = plt.subplots(2, 2, figsize=(10, 8))
+    axs[0, 0].plot(test_df["time_begin"][:display_window], test_df["theta_x"][:display_window], label="Actual")
+    axs[0, 0].plot(outputs_df["time_begin"][:display_window], outputs_df["theta_x"][:display_window], label="Predicted")
+    axs[0, 0].set_title("Theta X")
+    axs[0, 0].legend()
+    axs[0, 1].plot(test_df["time_begin"][:display_window], test_df["theta_y"][:display_window], label="Actual")
+    axs[0, 1].plot(outputs_df["time_begin"][:display_window], outputs_df["theta_y"][:display_window], label="Predicted")
+    axs[0, 1].set_title("Theta Y")
+    axs[0, 1].legend()
+    axs[1, 0].plot(test_df["time_begin"][:display_window], test_df["vel_x"][:display_window], label="Actual")
+    axs[1, 0].plot(outputs_df["time_begin"][:display_window], outputs_df["vel_x"][:display_window], label="Predicted")
+    axs[1, 0].set_title("Vel X")
+    axs[1, 0].legend()
+    axs[1, 1].plot(test_df["time_begin"][:display_window], test_df["vel_y"][:display_window], label="Actual")
+    axs[1, 1].plot(outputs_df["time_begin"][:display_window], outputs_df["vel_y"][:display_window], label="Predicted")
+    axs[1, 1].legend()
+    axs[1, 1].set_title("Vel Y")
+    fig.suptitle(run_name, fontsize=16)
+    return fig
