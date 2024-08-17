@@ -73,6 +73,11 @@ def rollout(model_path,
     stateful = False if 'stateless' in model_path_lower else False
     seq_len = 10 if 'len10' in model_path_lower else 50
     vel = True if 'vel' in model_path_lower else False
+    no_time = True if 'no_time' in model_path_lower else False
+    
+    if 'raw' in model_path_lower:
+        vel = False
+        no_time = True
     
     if model_type == 'LSTM':
         model = FK_LSTM(input_size=input_size,
@@ -118,6 +123,10 @@ def rollout(model_path,
         for i in tqdm(range(seq_len, test_df.shape[0])):
             if vel:
                 data = outputs[i - seq_len:i]
+            elif not vel and no_time:
+                data = outputs[i - seq_len:i, 2:-2]
+            elif no_time:
+                data = outputs[i - seq_len:i, 2:]
             else:
                 data = outputs[i - seq_len:i, :-2]
             time_begin, time_begin_traj, theta_x, theta_y, X_throttle, Y_throttle, vel_x, vel_y  = test_tensor[i - 1]

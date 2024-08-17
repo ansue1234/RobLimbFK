@@ -9,16 +9,15 @@
 
 python train_seq2seq.py --epochs 200 \
                         --batch_size 512 \
-                        --exp_name no_time\
+                        --exp_name raw\
                         --train_data_path ../ml_data/train_data.csv \
                         --test_data_path ../ml_data/test_data.csv \
                         --seq_len 50 \
                         --underlying_model LSTM \
                         --attention true \
-                        --vel true \
                         --no_time true \
                         --seed 1 \
-                        --tag no_time
+                        --tag raw
 
 # python train_seq2seq.py --epochs 200 \
 #                         --batch_size 512 \
@@ -46,15 +45,14 @@ python train_seq2seq.py --epochs 200 \
 
 python train_seq2seq.py --epochs 200 \
                         --batch_size 512 \
-                        --exp_name no_time\
+                        --exp_name raw\
                         --train_data_path ../ml_data/train_data.csv \
                         --test_data_path ../ml_data/test_data.csv \
                         --seq_len 50 \
                         --underlying_model LSTM \
-                        --vel true \
                         --no_time true \
                         --seed 1 \
-                        --tag no_time
+                        --tag raw
 
 
 # python train_seq2seq.py --epochs 200 \
@@ -76,12 +74,11 @@ python train_seq2seq.py --epochs 200 \
 # # RNN
 python train_RNN.py --epochs 200 \
                     --batch_size 512 \
-                    --exp_name no_time\
+                    --exp_name raw\
                     --seq_len 50 \
-                    --vel true \
                     --no_time true \
                     --seed 1 \
-                    --tag no_time
+                    --tag raw
 
 # python train_RNN.py --epochs 200 \
 #                     --batch_size 512 \
@@ -105,14 +102,13 @@ python train_RNN.py --epochs 200 \
 # # LSTM Stateful
 python train_LSTM.py --epochs 200 \
                      --batch_size 512 \
-                     --exp_name no_time\
+                     --exp_name raw\
                      --train_data_path ../ml_data/train_data.csv \
                      --test_data_path ../ml_data/test_data.csv \
                      --seq_len 50 \
-                     --vel true \
                      --no_time true \
                      --seed 1 \
-                     --tag no_time
+                     --tag raw
 
 # python train_LSTM.py --epochs 200 \
 #                      --batch_size 512 \
