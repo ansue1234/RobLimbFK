@@ -30,14 +30,14 @@ const int max_state = 100; //Boundary of state space
 
 //Set Min and Max based on velocities of limb
 //Blue Limbs
-//const float PWMMaxPX = 25.00;
-//const float PWMMinPX = 15.00;
-//const float PWMMaxNX = 25.00;
-//const float PWMMinNX = 15.00;
-//const float PWMMaxPY = 25.00;
-//const float PWMMinPY = 15.00;
-//const float PWMMaxNY = 25.00;
-//const float PWMMinNY = 15.00;
+const float PWMMaxPX = 25.00;
+const float PWMMinPX = 15.00;
+const float PWMMaxNX = 25.00;
+const float PWMMinNX = 15.00;
+const float PWMMaxPY = 25.00;
+const float PWMMinPY = 15.00;
+const float PWMMaxNY = 25.00;
+const float PWMMinNY = 15.00;
 
 //Teal thin SMA limbs
 //const float PWMMaxPX = 20.00;
@@ -52,14 +52,14 @@ const int max_state = 100; //Boundary of state space
 // Purple limbs
 
 
-const float PWMMaxPX = 40.00;
-const float PWMMinPX = 20.00;
-const float PWMMaxNX = 40.00;
-const float PWMMinNX = 20.00;
-const float PWMMaxPY = 40.00;
-const float PWMMinPY = 20.00;
-const float PWMMaxNY = 40.00;
-const float PWMMinNY = 20.00;
+//const float PWMMaxPX = 40.00;
+//const float PWMMinPX = 20.00;
+//const float PWMMaxNX = 40.00;
+//const float PWMMinNX = 20.00;
+//const float PWMMaxPY = 40.00;
+//const float PWMMinPY = 20.00;
+//const float PWMMaxNY = 40.00;
+//const float PWMMinNY = 20.00;
 
 //const int Cool_Time = 20000;
 const int Cool_Time = 50;
@@ -281,7 +281,7 @@ void setup()
   pinMode(PWMNX,OUTPUT);
   pinMode(PWMPY,OUTPUT);
   pinMode(PWMNY,OUTPUT);
-  randomSeed(33);
+  randomSeed(55);
 
 
   Wire.begin();
