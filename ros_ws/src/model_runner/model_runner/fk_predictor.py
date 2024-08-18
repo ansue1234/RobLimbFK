@@ -64,7 +64,7 @@ class Predictor(Node):
         self.data_input = None
         self.act_subscriber_
         self.angle_subscriber_
-        
+        self.model_type = model_type
         
         # Setting up model
         self.hidden = (torch.zeros(num_layers, 1, hidden_size),
@@ -78,7 +78,9 @@ class Predictor(Node):
                                  output_size=4,
                                  device=self.device,
                                  batch_first=True).to(device=self.device)
-            self.model.load_state_dict(torch.load(model_path), map_location=self.device)
+            # self.get_logger().info("Read Sensor failed!!!!")
+            self.get_logger().info(self.device)
+            self.model.load_state_dict(torch.load(model_path, map_location=self.device, weights_only=True))
             self.model.h0, self.model.c0 = self.hidden
         elif model_type == 'SEQ2SEQ':
             self.model = FK_SEQ2SEQ(input_size=input_size,
@@ -93,17 +95,28 @@ class Predictor(Node):
                                     attention=attention,
                                     pred_len=1,
                                     teacher_forcing_ratio=0.0).to(device=self.device)
-            self.model.load_state_dict(torch.load(model_path), map_location=self.device)
+            self.model.load_state_dict(torch.load(model_path, map_location=self.device, weights_only=True))
             self.model.encoder.h0, self.model.encoder.c0 = self.hidden
         self.model.eval()
+        
+        date = datetime.datetime.now().strftime(r"%Y_%m_%d_%H_%M_%S")
+        result_file = self.results_path + date + '.txt'
+        self.result_file = open(result_file, 'w')
     
     def _get_throttle(self):
+        thr = Throttle()
         if len(self.throttle_queue) != 0:
-            return self.throttle_queue[0]
-        return (0, 0)
+            throttle_x, throttle_y = self.throttle_queue.pop(0)
+        else:
+            throttle_x, throttle_y = 0.0, 0.0
+        thr.throttle_x = throttle_x
+        thr.throttle_y = throttle_y
+        self.thr_publisher_.publish(thr)
+        return (throttle_x, throttle_y)
+        
     
     def _get_pred(self):
-        input_val = self._prep_input()
+        input_val, thr = self._prep_input()
         with torch.no_grad():
             if self.model_type == 'LSTM':
                 hn, cn = self.hidden
@@ -112,7 +125,7 @@ class Predictor(Node):
             elif self.model_type == 'SEQ2SEQ':
                 delta_states, self.hidden = self.model(input_val.unsqueeze(0), None, self.hidden, mode='test')
         
-        return delta_states.squeeze(0)
+        return delta_states.squeeze(0), thr
     
     def _get_state(self):
         if not self.rollout:
@@ -125,10 +138,11 @@ class Predictor(Node):
             return self.pred_next_state.theta_x, self.pred_next_state.theta_y, self.pred_next_state.vel_x, self.pred_next_state.vel_y
             
     def _prep_input(self):
+        thr = self._get_throttle()
         if self.no_time:
-            curr_input = torch.tensor([*self._get_state(), *self._get_throttle()]).to(device=self.device)
+            curr_input = torch.tensor([*self._get_state(), *thr]).to(device=self.device)
         else:
-            curr_input = torch.tensor([self.curr_time.nanoseconds*1e-9, self.self.curr_time.nanoseconds*1e-9, *self._get_state(), *self._get_throttle()]).to(device=self.device)
+            curr_input = torch.tensor([self.curr_time.nanoseconds*1e-9, self.self.curr_time.nanoseconds*1e-9, *self._get_state(), *thr]).to(device=self.device)
         
         # stacking to seq_len
         if self.data_input is None:
@@ -137,7 +151,7 @@ class Predictor(Node):
             self.data_input = torch.cat((self.data_input, curr_input.unsqueeze(0)), dim=0)
         if len(self.data_input) > self.seq_len:
             self.data_input = self.data_input[1:]
-        return self.data_input
+        return self.data_input, thr
         
     
     # stores the newest received command in a queue
@@ -164,38 +178,65 @@ class Predictor(Node):
         if self.past_time is None:
             self.past_time = curr_time
         if self.past_ang is None:
-            self.past_ang = self.curr_ang
+            self.past_ang = curr_angle
         
         # update the current state
         self.curr_state = State()
         self.curr_state.theta_x = curr_angle.theta_x
         self.curr_state.theta_y = curr_angle.theta_y
-        self.curr_state.vel_x = (curr_angle.theta_x - self.past_ang.theta_x) / ((curr_time - self.past_time).nanoseconds*1e-9)
-        self.curr_state.vel_y = (curr_angle.theta_y - self.past_ang.theta_y) / ((curr_time - self.past_time).nanoseconds*1e-9)
-        
+        try:
+            self.curr_state.vel_x = (curr_angle.theta_x - self.past_ang.theta_x) / ((curr_time - self.past_time).nanoseconds*1e-9)
+            self.curr_state.vel_y = (curr_angle.theta_y - self.past_ang.theta_y) / ((curr_time - self.past_time).nanoseconds*1e-9)
+        except:
+            self.curr_state.vel_x = 0.0
+            self.curr_state.vel_y = 0.0
+            
+        if self.pred_next_state is None:
+            self.pred_next_state = State()
+            self.pred_next_state.theta_x = self.curr_state.theta_x
+            self.pred_next_state.theta_y = self.curr_state.theta_y
+            self.pred_next_state.vel_x = self.curr_state.vel_x
+            self.pred_next_state.vel_y = self.curr_state.vel_y
         self.curr_ang = curr_angle
         self.curr_time = curr_time
     
     def timer_callback(self):
+        # self.get_logger().info("Predicting")
         if self.curr_state is not None:
-            delta_states = self._get_pred()
+            
+            delta_states, thr = self._get_pred()
             
             self.actual_state_publisher_.publish(self.curr_state)
             self.pred_publisher_.publish(self.pred_next_state)
-            
-            # append file pathe with today's date
-            date = datetime.datetime.now().strftime(r"%Y_%m_%d_%H_%M_%S")
-            result_file = self.results_path + date + '.txt'
-            with open(result_file, 'w') as f:
-                f.write(f"Actual, {self.curr_state.theta_x}, {self.curr_state.theta_y}, {self.curr_state.vel_x}, {self.curr_state.vel_y}\n")
-                f.write(f"Predicted, {self.pred_next_state.theta_x}, {self.pred_next_state.theta_y}, {self.pred_next_state.vel_x}, {self.pred_next_state.vel_y}\n")
-                
-            if self.rollout:
-                self.pred_next_state.theta_x += delta_states[0]
-                self.pred_next_state.theta_y += delta_states[1]
-                self.pred_next_state.vel_x += delta_states[2]
-                self.pred_next_state.vel_y += delta_states[3]
         
+            # append file pathe with today's date
+            # date = datetime.datetime.now().strftime(r"%Y_%m_%d_%H_%M_%S")
+            # result_file = self.results_path + date + '.txt'
+            # thr = self._get_throttle()
+            
+            self.result_file.write(f"Actual, {self.curr_state.theta_x}, {self.curr_state.theta_y}, {self.curr_state.vel_x}, {self.curr_state.vel_y}\n")
+            self.result_file.write(f"Predicted, {self.pred_next_state.theta_x}, {self.pred_next_state.theta_y}, {self.pred_next_state.vel_x}, {self.pred_next_state.vel_y}\n")
+            self.result_file.write(f"Throttle, {thr[0]}, {thr[1]}\n")
+            self.result_file.write(f"Time, {self.curr_time.nanoseconds*1e-9}\n")
+            
+            self.get_logger().info(f"Actual, {self.curr_state.theta_x}, {self.curr_state.theta_y}, {self.curr_state.vel_x}, {self.curr_state.vel_y}\n")
+            self.get_logger().info(f"Predicted, {self.pred_next_state.theta_x}, {self.pred_next_state.theta_y}, {self.pred_next_state.vel_x}, {self.pred_next_state.vel_y}\n")
+            self.get_logger().info(f"Throttle, {thr[0]}, {thr[1]}\n")
+            self.get_logger().info(f"Time, {self.curr_time.nanoseconds*1e-9}\n")
+            if self.rollout:
+                # self.get_logger().info("hi")
+                # string = str(delta_states[0, 0])
+                # self.get_logger().info(string)
+                self.pred_next_state.theta_x += delta_states[0, 0].item()
+                self.pred_next_state.theta_y += delta_states[0, 1].item()
+                self.pred_next_state.vel_x += delta_states[0, 2].item()
+                self.pred_next_state.vel_y += delta_states[0, 3].item()
+            else:
+                self.pred_next_state.theta_x = self.curr_state.theta_x + delta_states[0, 0].item()
+                self.pred_next_state.theta_y = self.curr_state.theta_y + delta_states[0, 1].item()
+                self.pred_next_state.vel_x = self.curr_state.vel_x + delta_states[0, 2].item()
+                self.pred_next_state.vel_y = self.curr_state.vel_y + delta_states[0, 3].item()
+            
 
 def main(args=None):
     rclpy.init(args=args)

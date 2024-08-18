@@ -1,18 +1,18 @@
 <!-- example.launch.xml -->
 
 <launch>
-  <node pkg="arduino_bridge" exec="teleop" name="tele">
+  <!-- <node pkg="arduino_bridge" exec="teleop" name="tele">
     <remap from="/throttle" to="/raw_throttle"/>
-  </node>
+  </node> -->
   <!-- perform remap so both turtles listen to the same command topic -->
   <node pkg="model_runner" exec="pred" name="predicor">
-    <param name="model_path" value=""/>
+    <param name="model_path" value="/home/ansue1234/Research/SML/RobLimbFK/ros_ws/src/model_runner/models/SEQ2SEQ_b512_e200_s-1_len50_raw_1723897200"/>
     <param name="input_size" value="4"/>
     <param name="model_type" value="SEQ2SEQ"/>
-    <param name="attention" value="true"/>
+    <param name="attention" value="false"/>
     <param name="vel" value="false"/>
     <param name="no_time" value="true"/>
     <param name="rollout" value="true"/>
-    <param name="results_path" value=""/>
+    <param name="results_path" value="/home/ansue1234/Research/SML/RobLimbFK/ros_ws/src/exp_results/"/>
   </node>
 </launch>
