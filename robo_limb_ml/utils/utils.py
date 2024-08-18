@@ -72,7 +72,7 @@ def rollout(model_path,
     attention = True if 'attention' in model_path_lower else False
     stateful = False if 'stateless' in model_path_lower else False
     seq_len = 10 if 'len10' in model_path_lower else 50
-    vel = True if 'vel' in model_path_lower else False
+    vel = True if 'vel' or 'no_time' in model_path_lower else False
     no_time = True if 'no_time' in model_path_lower else False
     
     if 'raw' in model_path_lower:
@@ -105,13 +105,14 @@ def rollout(model_path,
                    teacher_forcing_ratio=0.0).to(device=device)
         model.load_state_dict(torch.load(model_path, map_location=device))
         model.eval()
-    
-    test_df = pd.read_csv(test_data_path).dropna()
-    col_1 = test_df.pop('vel_x')
-    test_df.insert(7, col_1.name, col_1)
-    col_2 = test_df.pop('vel_y')
-    test_df.insert(7, col_2.name, col_2)
-    
+    if not vel:
+        test_df = pd.read_csv(test_data_path).dropna()
+        col_1 = test_df.pop('vel_x')
+        test_df.insert(7, col_1.name, col_1)
+        col_2 = test_df.pop('vel_y')
+        test_df.insert(7, col_2.name, col_2)
+    else:
+        test_df = pd.read_csv(test_data_path).dropna()
     test_tensor = torch.tensor(test_df.values.copy(), dtype=torch.float32).to(device=device)
     # obs_tensor = torch.tensor(test_df.drop(columns=["vel_x", "vel_y"]).values, dtype=torch.float32).to(device=device)
     outputs = torch.zeros(test_df.shape).to(device=device)
@@ -123,13 +124,18 @@ def rollout(model_path,
         for i in tqdm(range(seq_len, test_df.shape[0])):
             if vel:
                 data = outputs[i - seq_len:i]
-            elif not vel and no_time:
+            if not vel and no_time:
                 data = outputs[i - seq_len:i, 2:-2]
-            elif no_time:
-                data = outputs[i - seq_len:i, 2:]
-            else:
+            if not vel and not no_time:
                 data = outputs[i - seq_len:i, :-2]
-            time_begin, time_begin_traj, theta_x, theta_y, X_throttle, Y_throttle, vel_x, vel_y  = test_tensor[i - 1]
+            if vel and no_time:
+                data = outputs[i - seq_len:i, 2:]
+            
+            if not vel:    
+                time_begin, time_begin_traj, theta_x, theta_y, X_throttle, Y_throttle, vel_x, vel_y  = test_tensor[i - 1]
+            else:
+                time_begin, time_begin_traj, theta_x, theta_y, vel_x, vel_y, X_throttle, Y_throttle  = test_tensor[i - 1]
+                
             if stateful:
                 if model_type == 'LSTM':
                     delta_states, hn, cn = model(data.unsqueeze(0), hn, cn)
@@ -141,9 +147,14 @@ def rollout(model_path,
                 else:
                     delta_states, _ = model(data.unsqueeze(0), None, hidden, mode='test')
             delta_states = delta_states.squeeze()
-            time_begin_1, time_begin_traj_1, _, _, X_throttle_1, Y_throttle_1, _, _ = test_tensor[i]
+            
             pred_theta_x, pred_theta_y, pred_vel_x, pred_vel_y = delta_states[0] + theta_x, delta_states[1] + theta_y, delta_states[2] + vel_x, delta_states[3] + vel_y
-            outputs[i] = torch.tensor([time_begin_1, time_begin_traj_1, pred_theta_x, pred_theta_y, X_throttle_1, Y_throttle_1, pred_vel_x, pred_vel_y]).to(device=device)
+            if not vel:
+                time_begin_1, time_begin_traj_1, _, _, X_throttle_1, Y_throttle_1, _, _ = test_tensor[i]
+                outputs[i] = torch.tensor([time_begin_1, time_begin_traj_1, pred_theta_x, pred_theta_y, X_throttle_1, Y_throttle_1, pred_vel_x, pred_vel_y]).to(device=device)
+            else:
+                time_begin_1, time_begin_traj_1, _, _, _, _, X_throttle_1, Y_throttle_1 = test_tensor[i]
+                outputs[i] = torch.tensor([time_begin_1, time_begin_traj_1, pred_theta_x, pred_theta_y, pred_vel_x, pred_vel_y, X_throttle_1, Y_throttle_1]).to(device=device)
             
     outputs_df = pd.DataFrame(outputs.cpu().detach().numpy(), columns=test_df.columns)
     output_states = torch.tensor(outputs_df[['theta_x', 'theta_y', 'vel_x', 'vel_y']].values, dtype=torch.float32).to(device=device)
@@ -158,22 +169,28 @@ def rollout(model_path,
     
     return outputs_df, test_df, r2_score, rmse
 
-def viz_graph(outputs_df, test_df, run_name, display_window=1500):
+def viz_graph(outputs_df, test_df, run_name, display_window=1500, show_end=False):
+    if show_end:
+        begin = test_df.shape[0] - display_window
+        end = test_df.shape[0]
+    else:
+        begin = 0
+        end = display_window
     fig, axs = plt.subplots(2, 2, figsize=(10, 8))
-    axs[0, 0].plot(test_df["time_begin"][:display_window], test_df["theta_x"][:display_window], label="Actual")
-    axs[0, 0].plot(outputs_df["time_begin"][:display_window], outputs_df["theta_x"][:display_window], label="Predicted")
+    axs[0, 0].plot(test_df["time_begin"][begin:end], test_df["theta_x"][:display_window], label="Actual")
+    axs[0, 0].plot(outputs_df["time_begin"][begin:end], outputs_df["theta_x"][:display_window], label="Predicted")
     axs[0, 0].set_title("Theta X")
     axs[0, 0].legend()
-    axs[0, 1].plot(test_df["time_begin"][:display_window], test_df["theta_y"][:display_window], label="Actual")
-    axs[0, 1].plot(outputs_df["time_begin"][:display_window], outputs_df["theta_y"][:display_window], label="Predicted")
+    axs[0, 1].plot(test_df["time_begin"][begin:end], test_df["theta_y"][:display_window], label="Actual")
+    axs[0, 1].plot(outputs_df["time_begin"][begin:end], outputs_df["theta_y"][:display_window], label="Predicted")
     axs[0, 1].set_title("Theta Y")
     axs[0, 1].legend()
-    axs[1, 0].plot(test_df["time_begin"][:display_window], test_df["vel_x"][:display_window], label="Actual")
-    axs[1, 0].plot(outputs_df["time_begin"][:display_window], outputs_df["vel_x"][:display_window], label="Predicted")
+    axs[1, 0].plot(test_df["time_begin"][begin:end], test_df["vel_x"][:display_window], label="Actual")
+    axs[1, 0].plot(outputs_df["time_begin"][begin:end], outputs_df["vel_x"][:display_window], label="Predicted")
     axs[1, 0].set_title("Vel X")
     axs[1, 0].legend()
-    axs[1, 1].plot(test_df["time_begin"][:display_window], test_df["vel_y"][:display_window], label="Actual")
-    axs[1, 1].plot(outputs_df["time_begin"][:display_window], outputs_df["vel_y"][:display_window], label="Predicted")
+    axs[1, 1].plot(test_df["time_begin"][begin:end], test_df["vel_y"][:display_window], label="Actual")
+    axs[1, 1].plot(outputs_df["time_begin"][begin:end], outputs_df["vel_y"][:display_window], label="Predicted")
     axs[1, 1].legend()
     axs[1, 1].set_title("Vel Y")
     fig.suptitle(run_name, fontsize=16)
