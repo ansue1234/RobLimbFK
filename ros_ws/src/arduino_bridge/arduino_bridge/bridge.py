@@ -9,7 +9,7 @@ class Bridger(Node):
     def __init__(self):
         super().__init__('arduino_bridge')
         self.declare_parameters(
-		namespace='/',
+		namespace='',
 		parameters=[
 			('device', '/dev/ttyACM0'), #device we are trasmitting to & recieving messages from
 		    ('baudrate', 9600),
@@ -19,9 +19,9 @@ class Bridger(Node):
         # self.com_port = self.get_param_str('device')
         # self.freq = self.get_param_int('frequency')
         # self.baudrate = self.get_param_int('baudrate')
-        self.com_port = '/dev/ttyACM0'
-        self.freq = 100
-        self.baudrate = 9600
+        self.com_port = self.get_parameter('device').get_parameter_value().string_value
+        self.freq = self.get_parameter('frequency').get_parameter_value().integer_value 
+        self.baudrate = self.get_parameter('baudrate').get_parameter_value().integer_value
         self.publisher_ = self.create_publisher(Angles, 'limb_angles', 1)
         self.subscriber_ = self.create_subscription(Throttle, 'throttle', self.listener_callback, 2)
         
@@ -31,24 +31,6 @@ class Bridger(Node):
         self.throttle_queue = []
         self.subscriber_
 
-    def get_param_float(self, name):
-        try:
-            return float(self.get_parameter(name).get_parameter_value().double_value)
-        except:
-            pass
-
-    def get_param_int(self, name):
-        try:
-            print(self.get_parameter(name).get_parameter_value().double_value)
-            return int(self.get_parameter(name).get_parameter_value().double_value)
-        except:
-            pass
-
-    def get_param_str(self, name):
-        try:
-            return self.get_parameter(name).get_parameter_value().string_value
-        except:
-            pass
 
     def timer_callback(self):
         # reading sensor and publishing to topic

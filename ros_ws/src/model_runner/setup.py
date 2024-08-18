@@ -20,6 +20,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'pred = model_runner.fk_predictor:main'
         ],
     },
 )
