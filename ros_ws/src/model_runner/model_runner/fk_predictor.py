@@ -127,8 +127,8 @@ class Predictor(Node):
         
         return delta_states.squeeze(0), thr
     
-    def _get_state(self):
-        if not self.rollout:
+    def _get_state(self, init=False):
+        if not self.rollout or init:
             if not self.vel:
                 return self.curr_state.theta_x, self.curr_state.theta_y
             return self.curr_state.theta_x, self.curr_state.theta_y, self.curr_state.vel_x, self.curr_state.vel_y
@@ -137,10 +137,10 @@ class Predictor(Node):
                 return self.pred_next_state.theta_x, self.pred_next_state.theta_y
             return self.pred_next_state.theta_x, self.pred_next_state.theta_y, self.pred_next_state.vel_x, self.pred_next_state.vel_y
             
-    def _prep_input(self):
+    def _prep_input(self, init=False):
         thr = self._get_throttle()
         if self.no_time:
-            curr_input = torch.tensor([*self._get_state(), *thr]).to(device=self.device)
+            curr_input = torch.tensor([*self._get_state(init=init), *thr]).to(device=self.device)
         else:
             curr_input = torch.tensor([self.curr_time.nanoseconds*1e-9, self.self.curr_time.nanoseconds*1e-9, *self._get_state(), *thr]).to(device=self.device)
         
@@ -151,6 +151,7 @@ class Predictor(Node):
             self.data_input = torch.cat((self.data_input, curr_input.unsqueeze(0)), dim=0)
         if len(self.data_input) > self.seq_len:
             self.data_input = self.data_input[1:]
+            
         return self.data_input, thr
         
     
@@ -203,39 +204,42 @@ class Predictor(Node):
     def timer_callback(self):
         # self.get_logger().info("Predicting")
         if self.curr_state is not None:
-            
-            delta_states, thr = self._get_pred()
-            
-            self.actual_state_publisher_.publish(self.curr_state)
-            self.pred_publisher_.publish(self.pred_next_state)
-        
-            # append file pathe with today's date
-            # date = datetime.datetime.now().strftime(r"%Y_%m_%d_%H_%M_%S")
-            # result_file = self.results_path + date + '.txt'
-            # thr = self._get_throttle()
-            
-            self.result_file.write(f"Actual, {self.curr_state.theta_x}, {self.curr_state.theta_y}, {self.curr_state.vel_x}, {self.curr_state.vel_y}\n")
-            self.result_file.write(f"Predicted, {self.pred_next_state.theta_x}, {self.pred_next_state.theta_y}, {self.pred_next_state.vel_x}, {self.pred_next_state.vel_y}\n")
-            self.result_file.write(f"Throttle, {thr[0]}, {thr[1]}\n")
-            self.result_file.write(f"Time, {self.curr_time.nanoseconds*1e-9}\n")
-            
-            self.get_logger().info(f"Actual, {self.curr_state.theta_x}, {self.curr_state.theta_y}, {self.curr_state.vel_x}, {self.curr_state.vel_y}\n")
-            self.get_logger().info(f"Predicted, {self.pred_next_state.theta_x}, {self.pred_next_state.theta_y}, {self.pred_next_state.vel_x}, {self.pred_next_state.vel_y}\n")
-            self.get_logger().info(f"Throttle, {thr[0]}, {thr[1]}\n")
-            self.get_logger().info(f"Time, {self.curr_time.nanoseconds*1e-9}\n")
-            if self.rollout:
-                # self.get_logger().info("hi")
-                # string = str(delta_states[0, 0])
-                # self.get_logger().info(string)
-                self.pred_next_state.theta_x += delta_states[0, 0].item()
-                self.pred_next_state.theta_y += delta_states[0, 1].item()
-                self.pred_next_state.vel_x += delta_states[0, 2].item()
-                self.pred_next_state.vel_y += delta_states[0, 3].item()
+            # wait till sequence length is full
+            if self.data_input is None or len(self.data_input) < self.seq_len:
+                self._prep_input(init=True)
             else:
-                self.pred_next_state.theta_x = self.curr_state.theta_x + delta_states[0, 0].item()
-                self.pred_next_state.theta_y = self.curr_state.theta_y + delta_states[0, 1].item()
-                self.pred_next_state.vel_x = self.curr_state.vel_x + delta_states[0, 2].item()
-                self.pred_next_state.vel_y = self.curr_state.vel_y + delta_states[0, 3].item()
+                delta_states, thr = self._get_pred()
+                
+                self.actual_state_publisher_.publish(self.curr_state)
+                self.pred_publisher_.publish(self.pred_next_state)
+            
+                # append file pathe with today's date
+                # date = datetime.datetime.now().strftime(r"%Y_%m_%d_%H_%M_%S")
+                # result_file = self.results_path + date + '.txt'
+                # thr = self._get_throttle()
+                
+                self.result_file.write(f"Actual, {self.curr_state.theta_x}, {self.curr_state.theta_y}, {self.curr_state.vel_x}, {self.curr_state.vel_y}\n")
+                self.result_file.write(f"Predicted, {self.pred_next_state.theta_x}, {self.pred_next_state.theta_y}, {self.pred_next_state.vel_x}, {self.pred_next_state.vel_y}\n")
+                self.result_file.write(f"Throttle, {thr[0]}, {thr[1]}\n")
+                self.result_file.write(f"Time, {self.curr_time.nanoseconds*1e-9}\n")
+                
+                self.get_logger().info(f"Actual, {self.curr_state.theta_x}, {self.curr_state.theta_y}, {self.curr_state.vel_x}, {self.curr_state.vel_y}\n")
+                self.get_logger().info(f"Predicted, {self.pred_next_state.theta_x}, {self.pred_next_state.theta_y}, {self.pred_next_state.vel_x}, {self.pred_next_state.vel_y}\n")
+                self.get_logger().info(f"Throttle, {thr[0]}, {thr[1]}\n")
+                self.get_logger().info(f"Time, {self.curr_time.nanoseconds*1e-9}\n")
+                if self.rollout:
+                    # self.get_logger().info("hi")
+                    # string = str(delta_states[0, 0])
+                    # self.get_logger().info(string)
+                    self.pred_next_state.theta_x += delta_states[0, 0].item()
+                    self.pred_next_state.theta_y += delta_states[0, 1].item()
+                    self.pred_next_state.vel_x += delta_states[0, 2].item()
+                    self.pred_next_state.vel_y += delta_states[0, 3].item()
+                else:
+                    self.pred_next_state.theta_x = self.curr_state.theta_x + delta_states[0, 0].item()
+                    self.pred_next_state.theta_y = self.curr_state.theta_y + delta_states[0, 1].item()
+                    self.pred_next_state.vel_x = self.curr_state.vel_x + delta_states[0, 2].item()
+                    self.pred_next_state.vel_y = self.curr_state.vel_y + delta_states[0, 3].item()
             
 
 def main(args=None):

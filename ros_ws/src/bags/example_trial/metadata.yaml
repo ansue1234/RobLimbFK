@@ -1,0 +1,32 @@
+rosbag2_bagfile_information:
+  version: 5
+  storage_identifier: sqlite3
+  duration:
+    nanoseconds: 85472051023
+  starting_time:
+    nanoseconds_since_epoch: 1724025240398337352
+  message_count: 3422
+  topics_with_message_count:
+    - topic_metadata:
+        name: /raw_throttle
+        type: interfaces/msg/Throttle
+        serialization_format: cdr
+        offered_qos_profiles: "- history: 3\n  depth: 0\n  reliability: 1\n  durability: 2\n  deadline:\n    sec: 9223372036\n    nsec: 854775807\n  lifespan:\n    sec: 9223372036\n    nsec: 854775807\n  liveliness: 1\n  liveliness_lease_duration:\n    sec: 9223372036\n    nsec: 854775807\n  avoid_ros_namespace_conventions: false"
+      message_count: 1792
+    - topic_metadata:
+        name: /limb_angles
+        type: interfaces/msg/Angles
+        serialization_format: cdr
+        offered_qos_profiles: "- history: 3\n  depth: 0\n  reliability: 1\n  durability: 2\n  deadline:\n    sec: 9223372036\n    nsec: 854775807\n  lifespan:\n    sec: 9223372036\n    nsec: 854775807\n  liveliness: 1\n  liveliness_lease_duration:\n    sec: 9223372036\n    nsec: 854775807\n  avoid_ros_namespace_conventions: false"
+      message_count: 1630
+  compression_format: ""
+  compression_mode: ""
+  relative_file_paths:
+    - example_trial_0.db3
+  files:
+    - path: example_trial_0.db3
+      starting_time:
+        nanoseconds_since_epoch: 1724025240398337352
+      duration:
+        nanoseconds: 85472051023
+      message_count: 3422
