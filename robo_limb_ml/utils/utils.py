@@ -132,9 +132,9 @@ def rollout(model_path,
                 data = outputs[i - seq_len:i, 2:]
             
             if not vel:    
-                time_begin, time_begin_traj, theta_x, theta_y, X_throttle, Y_throttle, vel_x, vel_y  = test_tensor[i - 1]
+                time_begin, time_begin_traj, theta_x, theta_y, X_throttle, Y_throttle, vel_x, vel_y  = outputs[i - 1]
             else:
-                time_begin, time_begin_traj, theta_x, theta_y, vel_x, vel_y, X_throttle, Y_throttle  = test_tensor[i - 1]
+                time_begin, time_begin_traj, theta_x, theta_y, vel_x, vel_y, X_throttle, Y_throttle  = outputs[i - 1]
                 
             if stateful:
                 if model_type == 'LSTM':
