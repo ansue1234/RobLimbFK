@@ -72,9 +72,9 @@ def rollout(model_path,
     attention = True if 'attention' in model_path_lower else False
     stateful = False if 'stateless' in model_path_lower else False
     seq_len = 10 if 'len10' in model_path_lower else 50
-    vel = True if 'vel' or 'no_time' in model_path_lower else False
+    vel = True if 'vel' in model_path_lower or 'no_time' in model_path_lower else False
     no_time = True if 'no_time' in model_path_lower else False
-    
+    # print("model_path", model_path_lower)
     if 'raw' in model_path_lower:
         vel = False
         no_time = True
@@ -122,15 +122,17 @@ def rollout(model_path,
     hidden = (hn, cn)
     with torch.no_grad():
         for i in tqdm(range(seq_len, test_df.shape[0])):
-            if vel:
+            # print("vel", vel)
+            # print("no time", no_time)
+            if vel and not no_time:
                 data = outputs[i - seq_len:i]
-            if not vel and no_time:
+            elif not vel and no_time:
                 data = outputs[i - seq_len:i, 2:-2]
-            if not vel and not no_time:
+            elif not vel and not no_time:
                 data = outputs[i - seq_len:i, :-2]
-            if vel and no_time:
+            elif vel and no_time:
                 data = outputs[i - seq_len:i, 2:]
-            
+            # print("data shape", data.shape)
             if not vel:    
                 time_begin, time_begin_traj, theta_x, theta_y, X_throttle, Y_throttle, vel_x, vel_y  = outputs[i - 1]
             else:
@@ -177,20 +179,20 @@ def viz_graph(outputs_df, test_df, run_name, display_window=1500, show_end=False
         begin = 0
         end = display_window
     fig, axs = plt.subplots(2, 2, figsize=(10, 8))
-    axs[0, 0].plot(test_df["time_begin"][begin:end], test_df["theta_x"][:display_window], label="Actual")
-    axs[0, 0].plot(outputs_df["time_begin"][begin:end], outputs_df["theta_x"][:display_window], label="Predicted")
+    axs[0, 0].plot(test_df["time_begin"][begin:end], test_df["theta_x"][begin:end], label="Actual")
+    axs[0, 0].plot(outputs_df["time_begin"][begin:end], outputs_df["theta_x"][begin:end], label="Predicted")
     axs[0, 0].set_title("Theta X")
     axs[0, 0].legend()
-    axs[0, 1].plot(test_df["time_begin"][begin:end], test_df["theta_y"][:display_window], label="Actual")
-    axs[0, 1].plot(outputs_df["time_begin"][begin:end], outputs_df["theta_y"][:display_window], label="Predicted")
+    axs[0, 1].plot(test_df["time_begin"][begin:end], test_df["theta_y"][begin:end], label="Actual")
+    axs[0, 1].plot(outputs_df["time_begin"][begin:end], outputs_df["theta_y"][begin:end], label="Predicted")
     axs[0, 1].set_title("Theta Y")
     axs[0, 1].legend()
-    axs[1, 0].plot(test_df["time_begin"][begin:end], test_df["vel_x"][:display_window], label="Actual")
-    axs[1, 0].plot(outputs_df["time_begin"][begin:end], outputs_df["vel_x"][:display_window], label="Predicted")
+    axs[1, 0].plot(test_df["time_begin"][begin:end], test_df["vel_x"][begin:end], label="Actual")
+    axs[1, 0].plot(outputs_df["time_begin"][begin:end], outputs_df["vel_x"][begin:end], label="Predicted")
     axs[1, 0].set_title("Vel X")
     axs[1, 0].legend()
-    axs[1, 1].plot(test_df["time_begin"][begin:end], test_df["vel_y"][:display_window], label="Actual")
-    axs[1, 1].plot(outputs_df["time_begin"][begin:end], outputs_df["vel_y"][:display_window], label="Predicted")
+    axs[1, 1].plot(test_df["time_begin"][begin:end], test_df["vel_y"][begin:end], label="Actual")
+    axs[1, 1].plot(outputs_df["time_begin"][begin:end], outputs_df["vel_y"][begin:end], label="Predicted")
     axs[1, 1].legend()
     axs[1, 1].set_title("Vel Y")
     fig.suptitle(run_name, fontsize=16)

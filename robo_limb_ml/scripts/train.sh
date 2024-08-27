@@ -9,15 +9,185 @@
 
 python train_seq2seq.py --epochs 200 \
                         --batch_size 512 \
-                        --exp_name vel\
-                        --train_data_path ../ml_data/train_data.csv \
-                        --test_data_path ../ml_data/test_data.csv \
-                        --seq_len 50 \
+                        --exp_name no_cool_down_new\
+                        --train_data_path ../ml_data/purple_no_cool_down_train_data.csv \
+                        --test_data_path ../ml_data/purple_no_cool_down_test_data.csv \
+                        --seq_len 100 \
                         --underlying_model LSTM \
                         --attention true \
                         --vel true \
                         --seed 1 \
-                        --tag vel
+                        --tag seq_100_everything
+
+python train_seq2seq.py --epochs 200 \
+                        --batch_size 512 \
+                        --exp_name no_cool_down_new\
+                        --train_data_path ../ml_data/purple_no_cool_down_train_data.csv \
+                        --test_data_path ../ml_data/purple_no_cool_down_test_data.csv \
+                        --seq_len 100 \
+                        --underlying_model LSTM \
+                        --attention true \
+                        --vel true \
+                        --no_time true \
+                        --seed 1 \
+                        --tag seq_100_no_time
+
+
+python train_seq2seq.py --epochs 200 \
+                        --batch_size 512 \
+                        --exp_name no_cool_down_new\
+                        --train_data_path ../ml_data/purple_no_cool_down_train_data.csv \
+                        --test_data_path ../ml_data/purple_no_cool_down_test_data.csv \
+                        --seq_len 100 \
+                        --underlying_model LSTM \
+                        --vel true \
+                        --seed 1 \
+                        --tag seq_100_everything
+
+python train_seq2seq.py --epochs 200 \
+                        --batch_size 512 \
+                        --exp_name no_cool_down_new\
+                        --train_data_path ../ml_data/purple_no_cool_down_train_data.csv \
+                        --test_data_path ../ml_data/purple_no_cool_down_test_data.csv \
+                        --seq_len 100 \
+                        --underlying_model LSTM \
+                        --vel true \
+                        --no_time true \
+                        --seed 1 \
+                        --tag seq_100_no_time
+
+python train_LSTM.py --epochs 200 \
+                     --batch_size 512 \
+                     --exp_name no_cool_down_new\
+                     --train_data_path ../ml_data/purple_no_cool_down_train_data.csv \
+                     --test_data_path ../ml_data/purple_no_cool_down_test_data.csv \
+                     --seq_len 100 \
+                     --vel true \
+                     --seed 1 \
+                     --tag seq_100_everything
+
+python train_LSTM.py --epochs 200 \
+                     --batch_size 512 \
+                     --exp_name no_cool_down_new\
+                     --train_data_path ../ml_data/purple_no_cool_down_train_data.csv \
+                     --test_data_path ../ml_data/purple_no_cool_down_test_data.csv \
+                     --seq_len 100 \
+                     --vel true \
+                     --no_time true \
+                     --seed 1 \
+                     --tag seq_100_no_time
+
+python train_RNN.py --epochs 200 \
+                    --batch_size 512 \
+                    --exp_name no_cool_down_new\
+                    --train_data_path ../ml_data/purple_no_cool_down_train_data.csv \
+                    --test_data_path ../ml_data/purple_no_cool_down_test_data.csv \
+                    --seq_len 100 \
+                    --vel true \
+                    --no_time true \
+                    --seed 1 \
+                    --tag seq_100_no_time
+
+python train_RNN.py --epochs 200 \
+                    --batch_size 512 \
+                    --exp_name no_cool_down_new\
+                    --train_data_path ../ml_data/purple_no_cool_down_train_data.csv \
+                    --test_data_path ../ml_data/purple_no_cool_down_test_data.csv \
+                    --seq_len 100 \
+                    --vel true \
+                    --seed 1 \
+                    --tag seq_100_everything
+
+python train_seq2seq.py --epochs 400 \
+                        --batch_size 512 \
+                        --exp_name no_cool_down_new\
+                        --train_data_path ../ml_data/purple_no_cool_down_train_data.csv \
+                        --test_data_path ../ml_data/purple_no_cool_down_test_data.csv \
+                        --seq_len 100 \
+                        --underlying_model LSTM \
+                        --attention true \
+                        --vel true \
+                        --seed 1 \
+                        --tag seq_100_everything
+
+python train_seq2seq.py --epochs 400 \
+                        --batch_size 512 \
+                        --exp_name no_cool_down_new\
+                        --train_data_path ../ml_data/purple_no_cool_down_train_data.csv \
+                        --test_data_path ../ml_data/purple_no_cool_down_test_data.csv \
+                        --seq_len 100 \
+                        --underlying_model LSTM \
+                        --attention true \
+                        --vel true \
+                        --no_time true \
+                        --seed 1 \
+                        --tag seq_100_no_time
+
+
+python train_seq2seq.py --epochs 400 \
+                        --batch_size 512 \
+                        --exp_name no_cool_down_new\
+                        --train_data_path ../ml_data/purple_no_cool_down_train_data.csv \
+                        --test_data_path ../ml_data/purple_no_cool_down_test_data.csv \
+                        --seq_len 100 \
+                        --underlying_model LSTM \
+                        --vel true \
+                        --seed 1 \
+                        --tag seq_100_everything
+
+python train_seq2seq.py --epochs 400 \
+                        --batch_size 512 \
+                        --exp_name no_cool_down_new\
+                        --train_data_path ../ml_data/purple_no_cool_down_train_data.csv \
+                        --test_data_path ../ml_data/purple_no_cool_down_test_data.csv \
+                        --seq_len 100 \
+                        --underlying_model LSTM \
+                        --vel true \
+                        --no_time true \
+                        --seed 1 \
+                        --tag seq_100_no_time
+
+python train_LSTM.py --epochs 400 \
+                     --batch_size 512 \
+                     --exp_name no_cool_down_new\
+                     --train_data_path ../ml_data/purple_no_cool_down_train_data.csv \
+                     --test_data_path ../ml_data/purple_no_cool_down_test_data.csv \
+                     --seq_len 100 \
+                     --vel true \
+                     --seed 1 \
+                     --tag seq_100_everything
+
+python train_LSTM.py --epochs 400 \
+                     --batch_size 512 \
+                     --exp_name no_cool_down_new\
+                     --train_data_path ../ml_data/purple_no_cool_down_train_data.csv \
+                     --test_data_path ../ml_data/purple_no_cool_down_test_data.csv \
+                     --seq_len 100 \
+                     --vel true \
+                     --no_time true \
+                     --seed 1 \
+                     --tag seq_100_no_time
+
+python train_RNN.py --epochs 400 \
+                    --batch_size 512 \
+                    --exp_name no_cool_down_new\
+                    --train_data_path ../ml_data/purple_no_cool_down_train_data.csv \
+                    --test_data_path ../ml_data/purple_no_cool_down_test_data.csv \
+                    --seq_len 100 \
+                    --vel true \
+                    --no_time true \
+                    --seed 1 \
+                    --tag seq_100_no_time
+
+python train_RNN.py --epochs 400 \
+                    --batch_size 512 \
+                    --exp_name no_cool_down_new\
+                    --train_data_path ../ml_data/purple_no_cool_down_train_data.csv \
+                    --test_data_path ../ml_data/purple_no_cool_down_test_data.csv \
+                    --seq_len 100 \
+                    --vel true \
+                    --seed 1 \
+                    --tag seq_100_everything
 
 # python train_seq2seq.py --epochs 200 \
 #                         --batch_size 512 \
@@ -43,16 +213,16 @@ python train_seq2seq.py --epochs 200 \
 #                         --underlying_model LSTM \
 #                         --seed 1
 
-python train_seq2seq.py --epochs 200 \
-                        --batch_size 512 \
-                        --exp_name vel\
-                        --train_data_path ../ml_data/train_data.csv \
-                        --test_data_path ../ml_data/test_data.csv \
-                        --seq_len 50 \
-                        --underlying_model LSTM \
-                        --vel true \
-                        --seed 1 \
-                        --tag vel
+# python train_seq2seq.py --epochs 200 \
+#                         --batch_size 512 \
+#                         --exp_name vel\
+#                         --train_data_path ../ml_data/train_data.csv \
+#                         --test_data_path ../ml_data/test_data.csv \
+#                         --seq_len 50 \
+#                         --underlying_model LSTM \
+#                         --vel true \
+#                         --seed 1 \
+#                         --tag vel
 
 
 # python train_seq2seq.py --epochs 200 \

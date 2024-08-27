@@ -27,25 +27,25 @@ for file in tqdm(files):
     # skip RNN and MLP
     if 'rnn' in file_lower or 'mlp' in file_lower:
         continue
-    if 'vel' not in file_lower and 'no_time' not in file_lower:
-        continue
+    # if 'vel' not in file_lower and 'no_time' not in file_lower:
+    #     continue
     # if 'raw' not in file_lower:
     #     continue
-    
+    input_size = 6
     if 'vel' in file_lower:
         input_size = 8
-    elif 'raw' in file_lower:
+    if 'raw' in file_lower:
         input_size = 4
-    else:
-        input_size = 6
     
+    print("input shape", input_size)
+    test_data_path = '../ml_data/test_data.csv'
     if 'finetune' in file_lower:
         test_data_path = '../ml_data/purple_test_data.csv'
-    elif 'cool' in file_lower:
+    if 'cool' in file_lower:
         test_data_path = '../ml_data/purple_no_cool_down_test_data.csv'
-    else:
-        test_data_path = '../ml_data/test_data.csv'
+        
     filename = '../model_weights/new_weights/' + file
+    print('File', file)
     outputs_df, test_df, r2_score, rmse = rollout(filename,
                                                   test_data_path,
                                                   input_size,
@@ -59,6 +59,8 @@ for file in tqdm(files):
     with open("../results/"+file+".txt", 'w') as f:
         f.write("RMSE: " + str(rmse.item()) + '\n')
         f.write("R^2: " + str(r2_score.item()))
+    outputs_df.to_csv("../results/outputs_"+file+".csv")
+    test_df.to_csv("../results/test_"+file+".csv")
     
     fig.savefig("../results/"+file+".jpg")
     fig.show()
