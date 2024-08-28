@@ -27,6 +27,8 @@ for file in tqdm(files):
     # skip RNN and MLP
     if 'rnn' in file_lower or 'mlp' in file_lower:
         continue
+    if 'new' not in file_lower or 'time' not in file_lower:
+        continue
     # if 'vel' not in file_lower and 'no_time' not in file_lower:
     #     continue
     # if 'raw' not in file_lower:
@@ -41,9 +43,9 @@ for file in tqdm(files):
     test_data_path = '../ml_data/test_data.csv'
     if 'finetune' in file_lower:
         test_data_path = '../ml_data/purple_test_data.csv'
-    if 'cool' in file_lower:
+    if 'cool' in file_lower or 'new' in file_lower:
         test_data_path = '../ml_data/purple_no_cool_down_test_data.csv'
-        
+    print(test_data_path)
     filename = '../model_weights/new_weights/' + file
     print('File', file)
     outputs_df, test_df, r2_score, rmse = rollout(filename,

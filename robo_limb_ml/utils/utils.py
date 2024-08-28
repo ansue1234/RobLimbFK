@@ -71,7 +71,13 @@ def rollout(model_path,
     model_type = 'SEQ2SEQ' if 'seq2' in model_path_lower else 'LSTM'
     attention = True if 'attention' in model_path_lower else False
     stateful = False if 'stateless' in model_path_lower else False
-    seq_len = 10 if 'len10' in model_path_lower else 50
+    if 'len10' in model_path_lower:
+        seq_len = 10
+    elif 'new' in model_path_lower:
+        seq_len = 100
+    else:
+        seq_len = 50
+    # seq_len = 10 if 'len10' in model_path_lower else 50
     vel = True if 'vel' in model_path_lower or 'no_time' in model_path_lower else False
     no_time = True if 'no_time' in model_path_lower else False
     # print("model_path", model_path_lower)
