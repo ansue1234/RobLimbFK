@@ -7,7 +7,7 @@ from robo_limb_ml.models.fk_seq2seq import FK_SEQ2SEQ
 import yaml
 
 class LimbEnv(gym.Env):
-    def __init__(self, config_path, render_mode='human'):
+    def __init__(self, config_path, render_mode='human', seed=None):
         super(LimbEnv, self).__init__()
         
         with open(config_path, 'r') as file:
@@ -23,14 +23,14 @@ class LimbEnv(gym.Env):
         self.num_layers = config.get('num_layers', 3)
         self.attention = config.get('attention', False)
         self.action_type = config.get('action_type', 'continuous')
-        self.stateful = config.get('stateful', False)
+        self.stateful = config.get('stateful', True)
         self.vel_type = config.get('vel_type', 'computed')
         self.dt = config.get('dt', 0.075) # 75 ms
         self.theta_limit = config.get('theta_limit', 100)
         self.goal_tolerance = config.get('goal_tolerance', 1)
         self.int_actions = config.get('int_actions', False)
         self.render_mode = render_mode
-        
+        self.seed = seed
         # Setting up model
         self.hidden = (torch.zeros(self.num_layers, 1, self.hidden_dim),
                        torch.zeros(self.num_layers, 1, self.hidden_dim))
@@ -76,20 +76,23 @@ class LimbEnv(gym.Env):
         return self.data
     
     def reset(self, seed=None, options = None):
-        super().reset(seed=seed)
+        if self.seed is not None:
+            super().reset(seed=self.seed)
+        else:
+            super().reset(seed=seed)
         self.state = self.np_random.uniform(-60, 60, 4).astype(np.float32)
         self.goal = self.np_random.uniform(-60, 60, 2,).astype(np.float32)
         first_data_entry = np.concatenate((self.state, np.array([0.0, 0.0])), dtype=np.float32)
         self.data = torch.tensor(first_data_entry).unsqueeze(0)
-        # print('Initial State:', self.state)
         return self.state, {}
     
     def step(self, action):
         # prep data
-        action = action.astype(np.float32)
+
         if self.action_type == 'continuous':
             if self.int_actions:
-                action = np.round(action).astype(np.float32)
+                action = np.round(action)
+            action = action.astype(np.float32)
         else:
             action = np.array([action//21 - 10, action%21 - 10]).astype(np.float32)
         
@@ -192,7 +195,7 @@ class LimbEnv(gym.Env):
         plt.close(self.fig)
 
 class SafeLimbEnv(LimbEnv):
-    def __init__(self, config_path, render_mode='human'):
+    def __init__(self, config_path, seed=None, render_mode='human'):
         with open(config_path, 'r') as file:
             config = yaml.safe_load(file)
         
@@ -203,7 +206,7 @@ class SafeLimbEnv(LimbEnv):
         self.t = 0
         self.hit_unsafe = False
         
-        super(SafeLimbEnv, self).__init__(config_path=config_path, render_mode=render_mode)
+        super(SafeLimbEnv, self).__init__(config_path=config_path, render_mode=render_mode, seed=seed)
 
     def check_termination(self):
         if self.state[2] > self.theta_limit or self.state[2] < -self.theta_limit or self.state[3] > self.theta_limit or self.state[3] < -self.theta_limit:
@@ -248,6 +251,7 @@ class SafeLimbEnv(LimbEnv):
         self.t = 0
         self.hit_unsafe = False
         super(SafeLimbEnv, self).reset(seed=seed, options=options)
+        self.goal = np.zeros(2).astype(np.float32)
         self.state = self.np_random.uniform(-self.safe_zone, self.safe_zone, 4).astype(np.float32)
         return self.state, {}
     

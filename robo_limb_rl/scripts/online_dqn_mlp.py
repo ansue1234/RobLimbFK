@@ -12,7 +12,10 @@ import torch.optim as optim
 import tyro
 from stable_baselines3.common.buffers import ReplayBuffer
 from torch.utils.tensorboard import SummaryWriter
-
+import gymnasium as gym
+from robo_limb_rl.arch.Q_net import QNet_MLP
+from robo_limb_rl.envs.limb_env import LimbEnv, SafeLimbEnv
+from tqdm import tqdm
 
 @dataclass
 class Args:
@@ -28,7 +31,7 @@ class Args:
     """if toggled, this experiment will be tracked with Weights and Biases"""
     wandb_project_name: str = "cleanRL"
     """the wandb's project name"""
-    wandb_entity: str = None
+    wandb_entity: str = ""
     """the entity (team) of wandb's project"""
     capture_video: bool = False
     """whether to capture videos of the agent performances (check out `videos` folder)"""
@@ -56,7 +59,7 @@ class Args:
     """the target network update rate"""
     target_network_frequency: int = 500
     """the timesteps it takes to update the target network"""
-    batch_size: int = 128
+    batch_size: int = 512
     """the batch size of sample from the reply memory"""
     start_e: float = 1
     """the starting epsilon for exploration"""
@@ -68,45 +71,28 @@ class Args:
     """timestep to start learning"""
     train_frequency: int = 10
     """the frequency of training"""
+    env_config_path: str = ""
+    """the path to the yaml config of the environment"""
+    reward_type: str = 'reg'
+    """the type of reward function"""
 
-
-def make_env(env_id, seed, idx, capture_video, run_name):
+def make_env(env_id, seed, config_path):
     def thunk():
-        if capture_video and idx == 0:
-            env = gym.make(env_id, render_mode="rgb_array")
-            env = gym.wrappers.RecordVideo(env, f"videos/{run_name}")
-        else:
-            env = gym.make(env_id)
+        env = gym.make(env_id, seed, config_path=config_path, render_mode=None)
         env = gym.wrappers.RecordEpisodeStatistics(env)
         env.action_space.seed(seed)
-
         return env
-
     return thunk
 
 
 # ALGO LOGIC: initialize agent here:
-class QNetwork(nn.Module):
-    def __init__(self, env):
-        super().__init__()
-        self.network = nn.Sequential(
-            nn.Linear(np.array(env.single_observation_space.shape).prod(), 120),
-            nn.ReLU(),
-            nn.Linear(120, 84),
-            nn.ReLU(),
-            nn.Linear(84, env.single_action_space.n),
-        )
-
-    def forward(self, x):
-        return self.network(x)
-
-
 def linear_schedule(start_e: float, end_e: float, duration: int, t: int):
     slope = (end_e - start_e) / duration
     return max(slope * t + start_e, end_e)
 
 
 if __name__ == "__main__":
+    
     import stable_baselines3 as sb3
 
     if sb3.__version__ < "2.0":
@@ -117,6 +103,7 @@ poetry run pip install "stable_baselines3==2.0.0a1"
 """
         )
     args = tyro.cli(Args)
+    print(args.exp_name)
     assert args.num_envs == 1, "vectorized envs are not supported at the moment"
     run_name = f"{args.env_id}__{args.exp_name}__{args.seed}__{int(time.time())}"
     if args.track:
@@ -146,14 +133,15 @@ poetry run pip install "stable_baselines3==2.0.0a1"
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
 
     # env setup
+    safety_env = gym.make(args.env_id, seed=args.seed, config_path=args.env_config_path)
     envs = gym.vector.SyncVectorEnv(
-        [make_env(args.env_id, args.seed + i, i, args.capture_video, run_name) for i in range(args.num_envs)]
+        [make_env(args.env_id, args.seed + i, config_path=args.env_config_path) for i in range(args.num_envs)]
     )
     assert isinstance(envs.single_action_space, gym.spaces.Discrete), "only discrete action space is supported"
 
-    q_network = QNetwork(envs).to(device)
+    q_network = QNet_MLP(envs, reward_type=args.reward_type).to(device)
     optimizer = optim.Adam(q_network.parameters(), lr=args.learning_rate)
-    target_network = QNetwork(envs).to(device)
+    target_network = QNet_MLP(envs, reward_type=args.reward_type).to(device)
     target_network.load_state_dict(q_network.state_dict())
 
     rb = ReplayBuffer(
@@ -167,7 +155,7 @@ poetry run pip install "stable_baselines3==2.0.0a1"
 
     # TRY NOT TO MODIFY: start the game
     obs, _ = envs.reset(seed=args.seed)
-    for global_step in range(args.total_timesteps):
+    for global_step in tqdm(range(args.total_timesteps)):
         # ALGO LOGIC: put action logic here
         epsilon = linear_schedule(args.start_e, args.end_e, args.exploration_fraction * args.total_timesteps, global_step)
         if random.random() < epsilon:
@@ -183,7 +171,7 @@ poetry run pip install "stable_baselines3==2.0.0a1"
         if "final_info" in infos:
             for info in infos["final_info"]:
                 if info and "episode" in info:
-                    print(f"global_step={global_step}, episodic_return={info['episode']['r']}")
+                    # print(f"global_step={global_step}, episodic_return={info['episode']['r']}")
                     writer.add_scalar("charts/episodic_return", info["episode"]["r"], global_step)
                     writer.add_scalar("charts/episodic_length", info["episode"]["l"], global_step)
 
@@ -207,6 +195,26 @@ poetry run pip install "stable_baselines3==2.0.0a1"
                 old_val = q_network(data.observations).gather(1, data.actions).squeeze()
                 loss = F.mse_loss(td_target, old_val)
 
+                states = safety_env.sample_states(args.batch_size)
+                is_unsafe = ~safety_env.is_safe(states)
+                unsafe_states = states[is_unsafe].astype(np.float32)
+                unsafe_states = (
+                    torch.from_numpy(unsafe_states).to(device).to(torch.float32)
+                )
+                unsafe_qval_pred = q_network(unsafe_states)
+                unsafe_val_pred = unsafe_qval_pred.max(dim=1)[0]
+                if args.reward_type == 'reg':
+                    unsafe_val_true = (-1/(1-args.gamma))* torch.ones(
+                        unsafe_val_pred.shape, device=device, dtype=torch.float32
+                    )
+                else:
+                    unsafe_val_true = torch.zeros(
+                        unsafe_val_pred.shape, device=device, dtype=torch.float32
+                    )
+                unsafe_loss = F.mse_loss(unsafe_val_pred, unsafe_val_true)
+
+                safety_loss = loss + unsafe_loss
+                    
                 if global_step % 100 == 0:
                     writer.add_scalar("losses/td_loss", loss, global_step)
                     writer.add_scalar("losses/q_values", old_val.mean().item(), global_step)
@@ -229,27 +237,6 @@ poetry run pip install "stable_baselines3==2.0.0a1"
         model_path = f"runs/{run_name}/{args.exp_name}.cleanrl_model"
         torch.save(q_network.state_dict(), model_path)
         print(f"model saved to {model_path}")
-        from cleanrl_utils.evals.dqn_eval import evaluate
-
-        episodic_returns = evaluate(
-            model_path,
-            make_env,
-            args.env_id,
-            eval_episodes=10,
-            run_name=f"{run_name}-eval",
-            Model=QNetwork,
-            device=device,
-            epsilon=0.05,
-        )
-        for idx, episodic_return in enumerate(episodic_returns):
-            writer.add_scalar("eval/episodic_return", episodic_return, idx)
-
-        if args.upload_model:
-            from cleanrl_utils.huggingface import push_to_hub
-
-            repo_name = f"{args.env_id}-{args.exp_name}-seed{args.seed}"
-            repo_id = f"{args.hf_entity}/{repo_name}" if args.hf_entity else repo_name
-            push_to_hub(args, episodic_returns, repo_id, "DQN", f"runs/{run_name}", f"videos/{run_name}-eval")
 
     envs.close()
     writer.close()

@@ -7,14 +7,14 @@ hidden_dim: 512
 seq_len: 100
 num_layers: 3
 attention: True
-action_type: continuous
+action_type: discrete
 stateful: True
 vel_type: computed
 int_actions: True
 dt: 0.075 # 75 ms
 theta_limit: 100
 goal_tolerance: 1
-safe_zone: 30
+safe_zone: 20
 gamma: 0.99
 alpha: 0.01
 reward_type: reg

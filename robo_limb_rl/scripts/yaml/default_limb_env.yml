@@ -8,7 +8,7 @@ seq_len: 100
 num_layers: 3
 attention: False
 action_type: continuous
-stateful: False
+stateful: True
 vel_type: computed
 int_actions: True
 dt: 0.075 # 75 ms
