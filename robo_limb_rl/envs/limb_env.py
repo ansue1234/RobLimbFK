@@ -4,10 +4,15 @@ import numpy as np
 import torch
 from robo_limb_ml.models.fk_lstm import FK_LSTM
 from robo_limb_ml.models.fk_seq2seq import FK_SEQ2SEQ
+import yaml
 
 class LimbEnv(gym.Env):
-    def __init__(self, config):
+    def __init__(self, config_path, render_mode='human'):
         super(LimbEnv, self).__init__()
+        
+        with open(config_path, 'r') as file:
+            config = yaml.safe_load(file)
+        
         self.model_path = config.get('model_path', "")
         self.model_type = config.get('model_type', "SEQ2SEQ")
         self.viz_type = config.get('viz_type', 'scatter')
@@ -23,6 +28,8 @@ class LimbEnv(gym.Env):
         self.dt = config.get('dt', 0.075) # 75 ms
         self.theta_limit = config.get('theta_limit', 100)
         self.goal_tolerance = config.get('goal_tolerance', 1)
+        self.int_actions = config.get('int_actions', False)
+        self.render_mode = render_mode
         
         # Setting up model
         self.hidden = (torch.zeros(self.num_layers, 1, self.hidden_dim),
@@ -31,7 +38,7 @@ class LimbEnv(gym.Env):
         self.load_model(self.model_path)
         
         if self.action_type == 'continuous':
-            self.action_space = gym.spaces.Box(low=-1, high=1, shape=(2,))
+            self.action_space = gym.spaces.Box(low=-10, high=10, shape=(2,))
         else:
             self.action_space = gym.spaces.Discrete(441)
         self.observation_space = gym.spaces.Box(low=-self.theta_limit, high=self.theta_limit, shape=(4,))
@@ -68,16 +75,27 @@ class LimbEnv(gym.Env):
     def get_data(self):
         return self.data
     
-    def reset(self):
-        self.state = np.random.uniform(-60, 60, 4)
-        self.goal = np.random.uniform(-60, 60, 2)
-        self.data = torch.tensor(np.concatenate(self.state, np.array([0.0, 0.0])))
-        return self.state
+    def reset(self, seed=None, options = None):
+        super().reset(seed=seed)
+        self.state = self.np_random.uniform(-60, 60, 4).astype(np.float32)
+        self.goal = self.np_random.uniform(-60, 60, 2,).astype(np.float32)
+        first_data_entry = np.concatenate((self.state, np.array([0.0, 0.0])), dtype=np.float32)
+        self.data = torch.tensor(first_data_entry).unsqueeze(0)
+        # print('Initial State:', self.state)
+        return self.state, {}
     
     def step(self, action):
         # prep data
-        current_data_entry = torch.tensor(np.concatenate((self.state, action)))
-        self.data = torch.cat((self.data, current_data_entry))
+        action = action.astype(np.float32)
+        if self.action_type == 'continuous':
+            if self.int_actions:
+                action = np.round(action).astype(np.float32)
+        else:
+            action = np.array([action//21 - 10, action%21 - 10]).astype(np.float32)
+        
+        current_data_entry = torch.tensor(np.concatenate((self.state, action))).unsqueeze(0)
+        self.data = torch.cat((self.data, current_data_entry), dim=0)
+        # print('Data:', self.data)
         if self.data.shape[0] > self.seq_len:
             self.data = self.data[1:]
         
@@ -106,11 +124,14 @@ class LimbEnv(gym.Env):
         
         #termination condition
         done = self.check_termination()
+        
+        if self.render_mode == "human":
+            self.render()
     
         return self.state, reward, done, False, {} 
     
-    def render(self, mode='human'):
-        if mode == 'human':
+    def render(self):
+        if self.render_mode == 'human':
             # Update the scatter plot with the current state
             if self.viz_type == 'scatter':
                 self.scatter.set_offsets([self.state[0], self.state[1]])
@@ -121,7 +142,7 @@ class LimbEnv(gym.Env):
             self.ax.relim()
             self.ax.autoscale_view()
             plt.draw()
-            plt.pause(0.1)
+            plt.pause(self.dt)
         
     def load_model(self, model_path):
         if self.model_type == 'LSTM':
@@ -171,15 +192,19 @@ class LimbEnv(gym.Env):
         plt.close(self.fig)
 
 class SafeLimbEnv(LimbEnv):
-    def __init__(self, config):
-        super(SafeLimbEnv, self).__init__(config)
+    def __init__(self, config_path, render_mode='human'):
+        with open(config_path, 'r') as file:
+            config = yaml.safe_load(file)
+        
         self.safe_zone = config.get('safe_zone', 40)
         self.gamma = config.get('gamma', 0.99)
         self.alpha = config.get('alpha', 0.01)
         self.reward_type = config.get('reward_type', 'reg')
         self.t = 0
         self.hit_unsafe = False
-    
+        
+        super(SafeLimbEnv, self).__init__(config_path=config_path, render_mode=render_mode)
+
     def check_termination(self):
         if self.state[2] > self.theta_limit or self.state[2] < -self.theta_limit or self.state[3] > self.theta_limit or self.state[3] < -self.theta_limit:
             return True
@@ -219,11 +244,12 @@ class SafeLimbEnv(LimbEnv):
         self.t += 1
         return super(SafeLimbEnv, self).step(action)
     
-    def reset(self):
+    def reset(self, seed=None, options=None):
         self.t = 0
         self.hit_unsafe = False
-        super(SafeLimbEnv, self).reset()
-        self.state = np.random.uniform(-self.safe_zone, self.safe_zone, 4)
+        super(SafeLimbEnv, self).reset(seed=seed, options=options)
+        self.state = self.np_random.uniform(-self.safe_zone, self.safe_zone, 4).astype(np.float32)
+        return self.state, {}
     
     def is_safe(self, states):
         if states.ndim == 1:

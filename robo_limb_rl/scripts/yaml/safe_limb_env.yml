@@ -1,0 +1,21 @@
+model_path: '../../robo_limb_ml/model_weights/new_weights/SEQ2SEQ_ATTENTION_b512_e400_s-1_len100_no_cool_down_new_no_time_1724776441'
+model_type: 'SEQ2SEQ'
+viz_type: 'scatter'
+input_dim: 6
+output_dim: 4
+hidden_dim: 512
+seq_len: 100
+num_layers: 3
+attention: True
+action_type: continuous
+stateful: False
+vel_type: computed
+int_actions: True
+dt: 0.075 # 75 ms
+theta_limit: 100
+goal_tolerance: 1
+safe_zone: 20
+gamma: 0.99
+alpha: 0.01
+reward_type: reg
+
