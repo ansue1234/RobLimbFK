@@ -32,9 +32,10 @@ class LimbEnv(gym.Env):
         self.render_mode = render_mode
         self.seed = seed
         # Setting up model
-        self.hidden = (torch.zeros(self.num_layers, 1, self.hidden_dim),
-                       torch.zeros(self.num_layers, 1, self.hidden_dim))
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.hidden = (torch.zeros(self.num_layers, 1, self.hidden_dim).to(self.device),
+                       torch.zeros(self.num_layers, 1, self.hidden_dim).to(self.device))
+        
         self.load_model(self.model_path)
         
         if self.action_type == 'continuous':
@@ -83,7 +84,7 @@ class LimbEnv(gym.Env):
         self.state = self.np_random.uniform(-60, 60, 4).astype(np.float32)
         self.goal = self.np_random.uniform(-60, 60, 2,).astype(np.float32)
         first_data_entry = np.concatenate((self.state, np.array([0.0, 0.0])), dtype=np.float32)
-        self.data = torch.tensor(first_data_entry).unsqueeze(0)
+        self.data = torch.tensor(first_data_entry).to(self.device).unsqueeze(0)
         return self.state, {}
     
     def step(self, action):
@@ -96,7 +97,7 @@ class LimbEnv(gym.Env):
         else:
             action = np.array([action//21 - 10, action%21 - 10]).astype(np.float32)
         
-        current_data_entry = torch.tensor(np.concatenate((self.state, action))).unsqueeze(0)
+        current_data_entry = torch.tensor(np.concatenate((self.state, action))).to(self.device).unsqueeze(0)
         self.data = torch.cat((self.data, current_data_entry), dim=0)
         # print('Data:', self.data)
         if self.data.shape[0] > self.seq_len:
@@ -148,6 +149,7 @@ class LimbEnv(gym.Env):
             plt.pause(self.dt)
         
     def load_model(self, model_path):
+        print(self.device)
         if self.model_type == 'LSTM':
             self.model = FK_LSTM(input_size=self.input_dim,
                                  hidden_size=self.hidden_dim,

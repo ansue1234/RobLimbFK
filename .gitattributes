@@ -4,3 +4,4 @@ robo_limb_ml/model_weights/new_weights/** filter=lfs diff=lfs merge=lfs -text
 *.psd filter=lfs diff=lfs merge=lfs -text
 *.pkl filter=lfs diff=lfs merge=lfs -text
 *.npy filter=lfs diff=lfs merge=lfs -text
+*.cleanrl_model filter=lfs diff=lfs merge=lfs -text
