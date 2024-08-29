@@ -1,0 +1,1 @@
+import robo_limb_rl.envs.registration
