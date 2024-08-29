@@ -6,11 +6,11 @@
   </node> -->
   <!-- perform remap so both turtles listen to the same command topic -->
   <node pkg="model_runner" exec="pred" name="predicor">
-    <param name="model_path" value="/home/ansue1234/Research/SML/RobLimbFK/ros_ws/src/model_runner/models/SEQ2SEQ_b512_e200_s-1_len50_raw_1723897200"/>
-    <param name="input_size" value="4"/>
+    <param name="model_path" value="/home/ansue1234/Research/SML/RobLimbFK/ros_ws/src/model_runner/models/SEQ2SEQ_b512_e400_s-1_len100_no_cool_down_new_no_time_1724791809"/>
+    <param name="input_size" value="6"/>
     <param name="model_type" value="SEQ2SEQ"/>
     <param name="attention" value="false"/>
-    <param name="vel" value="false"/>
+    <param name="vel" value="true"/>
     <param name="no_time" value="true"/>
     <param name="rollout" value="true"/>
     <param name="results_path" value="/home/ansue1234/Research/SML/RobLimbFK/ros_ws/src/exp_results/"/>

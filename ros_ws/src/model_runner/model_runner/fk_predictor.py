@@ -47,7 +47,7 @@ class Predictor(Node):
         self.actual_state_publisher_ = self.create_publisher(State, 'actual_state', 1)
         self.pred_publisher_ = self.create_publisher(State, 'pred_state', 1)
         self.thr_publisher_ = self.create_publisher(Throttle, 'throttle', 1)
-        self.act_subscriber_ = self.create_subscription(Throttle, 'raw_throttle', self.throttle_listener_callback, 2)
+        self.act_subscriber_ = self.create_subscription(Throttle, 'raw_throttle', self.throttle_listener_callback, 100)
         self.angle_subscriber_ = self.create_subscription(Angles, 'limb_angles', self.angle_listener_callback, 2)
         
         self.freq = self.get_parameter('freq').get_parameter_value().integer_value
