@@ -1,6 +1,6 @@
 # regular reward
 python online_dqn_mlp.py \
-       --exp-name "online_first_attempt_s500000" \
+       --exp-name "online_s500000_reg_loss" \
        --track \
        --env-id "SafeLimbEnv-v0" \
        --wandb-project_name "soft_limb" \
@@ -8,4 +8,15 @@ python online_dqn_mlp.py \
        --total-timesteps 500000 \
        --reward-type "reg" \
        --env_config_path "../scripts/yaml/safe_limb_env_discrete.yml" \
+       --save_model \
+
+python online_dqn_mlp.py \
+       --exp-name "online_s500000_base_exp_loss" \
+       --track \
+       --env-id "SafeLimbEnv-v0" \
+       --wandb-project_name "soft_limb" \
+       --wandb-entity "gsue-research" \
+       --total-timesteps 500000 \
+       --reward-type "base_exp" \
+       --env_config_path "../scripts/yaml/safe_limb_env_discrete_base_exp.yml" \
        --save_model \

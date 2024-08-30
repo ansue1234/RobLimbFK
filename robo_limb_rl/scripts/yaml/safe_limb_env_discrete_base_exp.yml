@@ -17,5 +17,5 @@ goal_tolerance: 1
 safe_zone: 30
 gamma: 0.99
 alpha: 0.01
-reward_type: reg
+reward_type: base_exp
 

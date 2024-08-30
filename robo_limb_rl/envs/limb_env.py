@@ -228,7 +228,7 @@ class SafeLimbEnv(LimbEnv):
                     return -1/((1-self.gamma)*self.gamma**self.t)
                 else:
                     return -1
-        elif self.reward_type == 'exp':
+        elif self.reward_type == 'e_exp':
             if np.linalg.norm(state[:2]) <= self.safe_zone:
                 return np.exp(-np.power(self.gamma, self.t)/l)
             else:

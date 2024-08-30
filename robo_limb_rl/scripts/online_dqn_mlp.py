@@ -191,7 +191,11 @@ poetry run pip install "stable_baselines3==2.0.0a1"
                 data = rb.sample(args.batch_size)
                 with torch.no_grad():
                     target_max, _ = target_network(data.next_observations).max(dim=1)
-                    td_target = data.rewards.flatten() + args.gamma * target_max * (1 - data.dones.flatten())
+                    if args.reward_type == 'reg':
+                        td_target = data.rewards.flatten() + args.gamma * target_max * (1 - data.dones.flatten())
+                    else:
+                        td_target = data.rewards.flatten() * target_max
+                        
                 old_val = q_network(data.observations).gather(1, data.actions).squeeze()
                 loss = F.mse_loss(td_target, old_val)
 
@@ -217,13 +221,15 @@ poetry run pip install "stable_baselines3==2.0.0a1"
                     
                 if global_step % 100 == 0:
                     writer.add_scalar("losses/td_loss", loss, global_step)
+                    writer.add_scalar("losses/unsafe_loss", unsafe_loss, global_step)
+                    writer.add_scalar("losses/safety_loss", safety_loss, global_step)
                     writer.add_scalar("losses/q_values", old_val.mean().item(), global_step)
-                    print("SPS:", int(global_step / (time.time() - start_time)))
+                    # print("SPS:", int(global_step / (time.time() - start_time)))
                     writer.add_scalar("charts/SPS", int(global_step / (time.time() - start_time)), global_step)
 
                 # optimize the model
                 optimizer.zero_grad()
-                loss.backward()
+                safety_loss.backward()
                 optimizer.step()
 
             # update target network
@@ -233,10 +239,12 @@ poetry run pip install "stable_baselines3==2.0.0a1"
                         args.tau * q_network_param.data + (1.0 - args.tau) * target_network_param.data
                     )
 
-    if args.save_model:
-        model_path = f"runs/{run_name}/{args.exp_name}.cleanrl_model"
-        torch.save(q_network.state_dict(), model_path)
-        print(f"model saved to {model_path}")
+        if args.save_model and global_step % 100000 == 0:
+            model_path = f"runs/{run_name}/{args.exp_name}.cleanrl_model"
+            m_p = f"../policies/{run_name}/{args.exp_name}.cleanrl_model"
+            torch.save(q_network.state_dict(), model_path)
+            torch.save(q_network.state_dict(), m_p)
+            print(f"model saved to {model_path}")
 
     envs.close()
     writer.close()
