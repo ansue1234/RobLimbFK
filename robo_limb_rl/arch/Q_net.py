@@ -11,9 +11,9 @@ class QNet_MLP(nn.Module):
             output_dim = env.single_action_space.n
         if reward_type == 'reg':
             self.gamma = gamma
-            self.reward_type = reward_type
         else:
             self.lam = lam
+        self.reward_type = reward_type
         self.network = nn.Sequential(
             nn.Linear(input_dim, 512),
             nn.ReLU(),

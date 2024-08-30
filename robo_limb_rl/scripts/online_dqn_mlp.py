@@ -241,7 +241,7 @@ poetry run pip install "stable_baselines3==2.0.0a1"
 
         if args.save_model and global_step % 100000 == 0:
             model_path = f"runs/{run_name}/{args.exp_name}.cleanrl_model"
-            m_p = f"../policies/{run_name}/{args.exp_name}.cleanrl_model"
+            m_p = f"../policies/{run_name}_{args.exp_name}.cleanrl_model"
             torch.save(q_network.state_dict(), model_path)
             torch.save(q_network.state_dict(), m_p)
             print(f"model saved to {model_path}")
