@@ -7,6 +7,9 @@ from robo_limb_ml.models.fk_seq2seq import FK_SEQ2SEQ
 import yaml
 
 class LimbEnv(gym.Env):
+    metadata = {
+        "render_modes": ["human"],
+    }
     def __init__(self, config_path, render_mode='human', seed=None):
         super(LimbEnv, self).__init__()
         
@@ -264,3 +267,6 @@ class SafeLimbEnv(LimbEnv):
         else:
             return np.linalg.norm(states[:, :2], axis=1) <= self.safe_zone
     
+    def render(self):
+        self.ax.plot(np.sin(np.linspace(0, 2*np.pi, 100))*self.safe_zone, np.cos(np.linspace(0, 2*np.pi, 100))*self.safe_zone, 'g-')
+        super(SafeLimbEnv, self).render()

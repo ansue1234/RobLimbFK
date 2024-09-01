@@ -22,7 +22,7 @@ if __name__ == "__main__":
     for i in tqdm(range(1000)):
         # action = env.action_space.sample()  # Sample a random action
         
-        obs, reward, done, _, _ = env.step(0)
+        obs, reward, done, _, _ = env.step(221)
         if done:
             print(i, reward)
             break
