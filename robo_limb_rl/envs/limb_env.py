@@ -5,6 +5,7 @@ import torch
 from robo_limb_ml.models.fk_lstm import FK_LSTM
 from robo_limb_ml.models.fk_seq2seq import FK_SEQ2SEQ
 import yaml
+import random
 
 class LimbEnv(gym.Env):
     metadata = {
@@ -35,17 +36,27 @@ class LimbEnv(gym.Env):
         self.render_mode = render_mode
         self.seed = seed
         # Setting up model
+        if seed is not None:
+            random.seed(seed)
+            np.random.seed(seed)
+            torch.manual_seed(seed)
+            torch.backends.cudnn.deterministic = True
+            
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.hidden = (torch.zeros(self.num_layers, 1, self.hidden_dim).to(self.device),
                        torch.zeros(self.num_layers, 1, self.hidden_dim).to(self.device))
         
         self.load_model(self.model_path)
         
+        
         if self.action_type == 'continuous':
             self.action_space = gym.spaces.Box(low=-10, high=10, shape=(2,))
         else:
             self.action_space = gym.spaces.Discrete(441)
         self.observation_space = gym.spaces.Box(low=-self.theta_limit, high=self.theta_limit, shape=(4,))
+        if seed:
+            self.action_space.seed(seed)
+            self.observation_space.seed(seed)
         self.reset()
         
         # setting up visualizations

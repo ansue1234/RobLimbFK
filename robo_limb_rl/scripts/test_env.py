@@ -5,7 +5,7 @@ import numpy as np
 
 if __name__ == "__main__":
     
-    # env = gym.make('LimbEnv-v0', config_path='../scripts/yaml/default_limb_env.yml', render_mode=None)
+    nom_env = gym.make('LimbEnv-v0', config_path='../scripts/yaml/default_limb_env_discrete.yml', render_mode=None, seed=1)
 
     # obs = env.reset()
     # for i in tqdm(range(1000)):
@@ -15,15 +15,32 @@ if __name__ == "__main__":
     #         print(i)
     #         break
     # env.close()
-    env = gym.make('SafeLimbEnv-v0', config_path='../scripts/yaml/safe_limb_env_discrete.yml', render_mode='human')
+    safe_env = gym.make('SafeLimbEnv-v0', config_path='../scripts/yaml/safe_limb_env_discrete.yml', render_mode=None, seed=1)
 
-    obs, _ = env.reset()
-    env.set_state(np.zeros(4).astype(np.float32))
+    _, _ = nom_env.reset()
+    _, _ = safe_env.reset()
+    nom_env.set_state(np.zeros(4).astype(np.float32))
+    # nom_env.set_goal(np.zeros(2).astype(np.float32)+5)
+    safe_env.set_state(np.zeros(4).astype(np.float32))
     for i in tqdm(range(1000)):
         # action = env.action_space.sample()  # Sample a random action
         
-        obs, reward, done, _, _ = env.step(221)
-        if done:
-            print(i, reward)
+        safe_obs, safe_reward, safe_done, _, _ = safe_env.step(221)
+        nom_obs, nom_reward, nom_done, _, _ = nom_env.step(221)
+        print("safe_obs", safe_obs)
+        print("nom_obs", nom_obs)
+        if safe_done:
+            print(i, safe_reward, nom_reward)
             break
-    env.close()
+        if i % 10 == 0:
+            print("resetting")
+            nom_env.reset(seed=4)
+            safe_env.reset(seed=4)
+            nom_env.set_state(np.zeros(4).astype(np.float32))
+            # nom_env.set_goal(np.zeros(2).astype(np.float32)+5)
+            safe_env.set_state(np.zeros(4).astype(np.float32))
+        # if nom_done:
+        #     print(i, nom_reward)
+        #     break
+    safe_env.close()
+    nom_env.close()

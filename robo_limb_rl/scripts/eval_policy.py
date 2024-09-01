@@ -2,29 +2,22 @@ import torch
 import argparse
 import yaml
 import gymnasium as gym
+import numpy as np
+from robo_limb_rl.arch.Q_net import QNet_MLP, QNet_LSTM
+from robo_limb_rl.utils.policies import RandomPolicy
+from tqdm import tqdm
 
+def get_action(policy_dict, obs):
+    if policy_dict['algo'] == 'DQN':
+        q_values = policy_dict['qf'](obs)
+        return torch.argmax(q_values).item(), torch.max(q_values).item()
+    elif policy_dict['algo'] == 'SAC':
+        q_values = policy_dict['qf1'](obs)
+        return torch.argmax(q_values).item(), torch.max(q_values).item()
+    else:
+        return policy_dict['model'].model(obs), None
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--config_path', type=str, help='Path config file')
-    args = parser.parse_args()
-    
-    with open(args.config_path, 'r') as f:
-        config = yaml.safe_load(f)
-    
-    # Prep Environment
-    safe_env_config = config.get('safe_env', None)
-    if safe_env_config:
-        safe_env_config_path = safe_env_config['config_path']
-        safe_env = gym.make(safe_env_config['env_name'], config_path=safe_env_config_path, render_mode=safe_env_config['render_mode'])
-    
-    nom_env_config = config.get('nom_env', None)
-    if nom_env_config:
-        nom_env_config_path = nom_env_config['config_path']
-        nom_env = gym.make(nom_env_config['env_name'], config_path=nom_env_config_path, render_mode=nom_env_config['render_mode'])
-    
-    # Load Policy
-    policy_config = config.get('policy', None)
+def load_policy(policy_config, env, device):
     if policy_config:
         policy_types = policy_config['policy_types']
         policy_path = policy_config['policy_paths']
@@ -33,6 +26,7 @@ if __name__ == '__main__':
         
         for i, (policy_type, policy_path) in enumerate(zip(policy_types, policy_path)):
             if policy_type == 'QNet_MLP':
+                policy = QNet_MLP(input_dim=env.observation_space.shape[0], output_dim=env.action_space.shape[0], reward_type=args.reward_type).to(device)
                 policy = torch.load(policy_path)
             elif policy_type == 'QNet_LSTM':
                 policy = torch.load(policy_path)
@@ -40,13 +34,107 @@ if __name__ == '__main__':
                 raise ValueError(f'Policy type {policy_type} not supported')
             
             if algo_type == 'DQN' and i == 0:
+                policy_dict['algo'] = 'DQN'
                 policy_dict['qf'] = policy
             elif algo_type == 'SAC':
                 if i == 0:
+                    policy_dict['algo'] = 'SAC'
                     policy_dict['qf1'] = policy
                 if i == 1:
                     policy_dict['qf2'] = policy
                 else:
                     policy_dict['actor'] = policy
+        return policy_dict
+    return {'algo': 'Random',
+            'model': RandomPolicy(env)}
+
+def load_env(env_config):
+    if env_config:
+        env = gym.make(env_config['env_name'], config_path=env_config['config_path'], render_mode=env_config['render_mode'])
+        return env
+    return None
+
+def rollout(safe_env, nom_env, safe_policy_dict, nom_policy_dict, max_steps=1000, seed=1, intervention=True):
+    nom_obs, _ = nom_env.reset(seed=seed)
+    safe_obs, _ = safe_env.reset(seed=seed)
+    nom_env.set_state(np.zeros(4).astype(np.float32))
+    nom_env.set_goal(np.zeros(2).astype(np.float32)+110)
+    safe_env.set_state(np.zeros(4).astype(np.float32))
     
+    nom_rewards = 0
+    ep_len = 0
+    ep_ended = False
+    for i in range(max_steps):
+        # action = env.action_space.sample()  # Sample a random action
+        safe_action, safe_q_val = get_action(safe_policy_dict, safe_obs)
+        nom_action, _ = get_action(nom_policy_dict, nom_obs)
+        if safe_q_val > 0 and intervention:
+            action = nom_action
+        else:
+            action = safe_action
+        safe_obs, _, safe_done, _, _ = safe_env.step(action)
+        nom_obs, nom_reward, _, _, _ = nom_env.step(action)
+        nom_rewards += nom_reward
+        if safe_done:
+            if not ep_ended:
+                ep_len = i + 1
+                ep_ended = True
+            if intervention:
+                break
+    safe_env.close()
+    nom_env.close()
+    return ep_len, nom_rewards
+    
+    
+    
+# Only Safe Env for now, Nominal policy is a random policy, supports only MLP for now
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--config_path', type=str, help='Path config file')
+    args = parser.parse_args()
+    
+    with open(args.config_path, 'r') as f:
+        config = yaml.safe_load(f)
+    
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    seed = config.get('seed', 1)
+    
+    # Prep Environment
+    safe_env_config = config.get('safe_env', None)
+    safe_env = load_env(safe_env_config, seed)
+    nom_env_config = config.get('nom_env', None)
+    nom_env = load_env(nom_env_config, seed)
+    
+    # Load Policy
+    safe_policy_config = config.get('safety_policy', None)
+    safe_policy_dict = load_policy(safe_policy_config, safe_env, device)
+    nom_env_config = config.get('nominal_policy', None)
+    nom_policy_dict = load_policy(nom_env_config, nom_env, device)
+    
+    if safe_env is None or safe_policy_dict is None:
+        raise ValueError('Safe Env or Safe Policy not loaded properly')
+    if nom_env is None or nom_policy_dict is None:
+        print('Nominal Env or Nominal Policy not loaded properly')
+        print('Using Random Policy')
+        nom_env = load_env(safe_env_config, seed)
+    ep_len = 0
+    total_rewards = 0
+    max_steps = config.get('max_steps', 1000)
+    num_rollouts = config.get('num_rollouts', 100)
+    for i in tqdm(range(num_rollouts)):
+        steps, rewards = rollout(safe_env, nom_env, safe_policy_dict, nom_policy_dict, max_steps=max_steps, seed=i)
+        ep_len += steps
+        total_rewards += rewards
+        # print(f'Rollout {i}: Steps: {steps}, Rewards: {rewards}')
+    print('With Intervention:')
+    print(f'Success Rate:{ep_len//max_steps}/{num_rollouts}, Avg Rewards: {total_rewards/num_rollouts}')
+    
+    ep_len = 0
+    total_rewards = 0
+    for i in tqdm(range(num_rollouts)):
+        steps, rewards = rollout(safe_env, nom_env, safe_policy_dict, nom_policy_dict, max_steps=max_steps, seed=i, intervention=False)
+        ep_len += steps
+        total_rewards += rewards
+    print('Without Intervention:')
+    print(f'Success Rate:{ep_len//max_steps}/{num_rollouts}, Avg Rewards: {total_rewards/num_rollouts}')
         
