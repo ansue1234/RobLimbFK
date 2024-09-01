@@ -47,7 +47,7 @@ class LimbEnv(gym.Env):
                        torch.zeros(self.num_layers, 1, self.hidden_dim).to(self.device))
         
         self.load_model(self.model_path)
-        
+        self.model.eval()
         
         if self.action_type == 'continuous':
             self.action_space = gym.spaces.Box(low=-10, high=10, shape=(2,))
@@ -118,19 +118,24 @@ class LimbEnv(gym.Env):
             self.data = self.data[1:]
         
         # model inference
-        hn, cn = self.hidden
-        prev_state = self.state.copy()
-        if self.stateful:
-            if self.model_type == 'LSTM':
-                delta_states, hn, cn = self.model(self.data.unsqueeze(0), hn, cn)
-            elif self.model_type == 'SEQ2SEQ':
-                delta_states, self.hidden = self.model(self.data.unsqueeze(0), None, self.hidden, mode='test')
-        else:
-            if self.model_type == 'LSTM':
-                delta_states, _, _ = self.model(self.data.unsqueeze(0), hn, cn)
+        with torch.no_grad():
+            hn, cn = self.hidden
+            prev_state = self.state.copy()
+            if self.stateful:
+                if self.model_type == 'LSTM':
+                    delta_states, hn, cn = self.model(self.data.unsqueeze(0), hn.detach(), cn.detach())
+                elif self.model_type == 'SEQ2SEQ':
+                    hn, cn = self.hidden
+                    self.hidden = hn.detach(), cn.detach()
+                    delta_states, self.hidden = self.model(self.data.unsqueeze(0), None, self.hidden, mode='test')
             else:
-                delta_states, _ = self.model(self.data.unsqueeze(0), None, self.hidden, mode='test')
-        delta_states = delta_states.squeeze().detach().cpu().numpy()
+                if self.model_type == 'LSTM':
+                    delta_states, _, _ = self.model(self.data.unsqueeze(0), hn.detach(), cn.detach())
+                else:
+                    hn, cn = self.hidden
+                    self.hidden = hn.detach(), cn.detach()
+                    delta_states, _ = self.model(self.data.unsqueeze(0), None, self.hidden, mode='test')
+            delta_states = delta_states.squeeze().detach().cpu().numpy()
         
         # state updates
         self.state = self.state + delta_states

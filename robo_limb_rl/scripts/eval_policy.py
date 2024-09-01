@@ -8,9 +8,9 @@ from robo_limb_rl.utils.policies import RandomPolicy
 from robo_limb_rl.envs.limb_env import LimbEnv, SafeLimbEnv
 from tqdm import tqdm
 
-def get_action(policy_dict, obs):
+def get_action(policy_dict, obs, device):
     with torch.no_grad():
-        obs = torch.tensor(obs).to(torch.float32)
+        obs = torch.tensor(obs).to(device)
         if policy_dict['algo'] == 'DQN':
             q_values = policy_dict['qf'](obs)
             return torch.argmax(q_values).item(), torch.max(q_values).item()
@@ -59,7 +59,7 @@ def load_env(env_config, seed):
         return env
     return None
 
-def rollout(safe_env, nom_env, safe_policy_dict, nom_policy_dict, max_steps=1000, seed=1, intervention=True):
+def rollout(safe_env, nom_env, safe_policy_dict, nom_policy_dict, device, max_steps=1000, seed=1, intervention=True, ):
     nom_obs, _ = nom_env.reset(seed=seed)
     safe_obs, _ = safe_env.reset(seed=seed)
     nom_env.set_state(np.zeros(4).astype(np.float32))
@@ -71,9 +71,9 @@ def rollout(safe_env, nom_env, safe_policy_dict, nom_policy_dict, max_steps=1000
     ep_ended = False
     for i in tqdm(range(max_steps)):
         # action = env.action_space.sample()  # Sample a random action
-        safe_action, safe_q_val = get_action(safe_policy_dict, safe_obs)
-        nom_action, _ = get_action(nom_policy_dict, nom_obs)
-        if safe_q_val > 0 and intervention:
+        safe_action, safe_q_val = get_action(safe_policy_dict, safe_obs, device)
+        nom_action, _ = get_action(nom_policy_dict, nom_obs, device)
+        if safe_q_val > 10 and intervention:
             action = nom_action
         else:
             action = safe_action
@@ -128,19 +128,19 @@ if __name__ == '__main__':
     max_steps = config.get('max_steps', 1000)
     num_rollouts = config.get('num_rollouts', 100)
     for i in tqdm(range(num_rollouts)):
-        steps, rewards = rollout(safe_env, nom_env, safe_policy_dict, nom_policy_dict, max_steps=max_steps, seed=i)
+        steps, rewards = rollout(safe_env, nom_env, safe_policy_dict, nom_policy_dict, device, max_steps=max_steps, seed=i)
         ep_len += steps
         total_rewards += rewards
         # print(f'Rollout {i}: Steps: {steps}, Rewards: {rewards}')
     print('With Intervention:')
     print(f'Success Rate:{ep_len//max_steps}/{num_rollouts}, Avg Rewards: {total_rewards/num_rollouts}')
     
-    ep_len = 0
-    total_rewards = 0
-    for i in tqdm(range(num_rollouts)):
-        steps, rewards = rollout(safe_env, nom_env, safe_policy_dict, nom_policy_dict, max_steps=max_steps, seed=i, intervention=False)
-        ep_len += steps
-        total_rewards += rewards
-    print('Without Intervention:')
-    print(f'Success Rate:{ep_len//max_steps}/{num_rollouts}, Avg Rewards: {total_rewards/num_rollouts}')
+    # ep_len = 0
+    # total_rewards = 0
+    # for i in tqdm(range(num_rollouts)):
+    #     steps, rewards = rollout(safe_env, nom_env, safe_policy_dict, nom_policy_dict, device, max_steps=max_steps, seed=i, intervention=False)
+    #     ep_len += steps
+    #     total_rewards += rewards
+    # print('Without Intervention:')
+    # print(f'Success Rate:{ep_len//max_steps}/{num_rollouts}, Avg Rewards: {total_rewards/num_rollouts}')
         
