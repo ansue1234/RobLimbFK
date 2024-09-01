@@ -17,16 +17,23 @@ class QNet_MLP(nn.Module):
         self.network = nn.Sequential(
             nn.Linear(input_dim, 512),
             nn.ReLU(),
-            nn.Linear(512, 1024),
-            nn.ReLU(),
-            nn.Linear(1024, 2048),
-            nn.ReLU(),
-            nn.Linear(2048, 1024),
-            nn.ReLU(),
-            nn.Linear(1024, 512),
+            nn.Linear(512, 512),
             nn.ReLU(),
             nn.Linear(512, output_dim),
         )
+        # self.network = nn.Sequential(
+        #     nn.Linear(input_dim, 512),
+        #     nn.ReLU(),
+        #     nn.Linear(512, 1024),
+        #     nn.ReLU(),
+        #     nn.Linear(1024, 2048),
+        #     nn.ReLU(),
+        #     nn.Linear(2048, 1024),
+        #     nn.ReLU(),
+        #     nn.Linear(1024, 512),
+        #     nn.ReLU(),
+        #     nn.Linear(512, output_dim),
+        # )
 
     def forward(self, x):
         out = self.network(x)
