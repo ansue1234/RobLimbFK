@@ -5,19 +5,22 @@ import gymnasium as gym
 import numpy as np
 from robo_limb_rl.arch.Q_net import QNet_MLP, QNet_LSTM
 from robo_limb_rl.utils.policies import RandomPolicy
+from robo_limb_rl.envs.limb_env import LimbEnv, SafeLimbEnv
 from tqdm import tqdm
 
 def get_action(policy_dict, obs):
-    if policy_dict['algo'] == 'DQN':
-        q_values = policy_dict['qf'](obs)
-        return torch.argmax(q_values).item(), torch.max(q_values).item()
-    elif policy_dict['algo'] == 'SAC':
-        q_values = policy_dict['qf1'](obs)
-        return torch.argmax(q_values).item(), torch.max(q_values).item()
-    else:
-        return policy_dict['model'].model(obs), None
+    with torch.no_grad():
+        obs = torch.tensor(obs).to(torch.float32)
+        if policy_dict['algo'] == 'DQN':
+            q_values = policy_dict['qf'](obs)
+            return torch.argmax(q_values).item(), torch.max(q_values).item()
+        elif policy_dict['algo'] == 'SAC':
+            q_values = policy_dict['qf1'](obs)
+            return torch.argmax(q_values).item(), torch.max(q_values).item()
+        else:
+            return policy_dict['model'].model(obs), None
 
-def load_policy(policy_config, env, device):
+def load_policy(policy_config, env, device, safe_env=None):
     if policy_config:
         policy_types = policy_config['policy_types']
         policy_path = policy_config['policy_paths']
@@ -26,8 +29,10 @@ def load_policy(policy_config, env, device):
         
         for i, (policy_type, policy_path) in enumerate(zip(policy_types, policy_path)):
             if policy_type == 'QNet_MLP':
-                policy = QNet_MLP(input_dim=env.observation_space.shape[0], output_dim=env.action_space.shape[0], reward_type=args.reward_type).to(device)
-                policy = torch.load(policy_path)
+                # print("obs shape", env.action_space.shape)
+                policy = QNet_MLP(input_dim=env.observation_space.shape[0], output_dim=env.action_space.n, reward_type=policy_config['reward_type']).to(device)
+                policy.load_state_dict(torch.load(policy_path, map_location=device))
+                policy.eval()
             elif policy_type == 'QNet_LSTM':
                 policy = torch.load(policy_path)
             else:
@@ -46,11 +51,11 @@ def load_policy(policy_config, env, device):
                     policy_dict['actor'] = policy
         return policy_dict
     return {'algo': 'Random',
-            'model': RandomPolicy(env)}
+            'model': RandomPolicy(safe_env)}
 
-def load_env(env_config):
+def load_env(env_config, seed):
     if env_config:
-        env = gym.make(env_config['env_name'], config_path=env_config['config_path'], render_mode=env_config['render_mode'])
+        env = gym.make(env_config['env_name'], config_path=env_config['config_path'], render_mode=env_config['render_mode'], seed=seed)
         return env
     return None
 
@@ -64,7 +69,7 @@ def rollout(safe_env, nom_env, safe_policy_dict, nom_policy_dict, max_steps=1000
     nom_rewards = 0
     ep_len = 0
     ep_ended = False
-    for i in range(max_steps):
+    for i in tqdm(range(max_steps)):
         # action = env.action_space.sample()  # Sample a random action
         safe_action, safe_q_val = get_action(safe_policy_dict, safe_obs)
         nom_action, _ = get_action(nom_policy_dict, nom_obs)
@@ -72,6 +77,7 @@ def rollout(safe_env, nom_env, safe_policy_dict, nom_policy_dict, max_steps=1000
             action = nom_action
         else:
             action = safe_action
+        # action = torch.tensor(action).to(torch.float32)
         safe_obs, _, safe_done, _, _ = safe_env.step(action)
         nom_obs, nom_reward, _, _, _ = nom_env.step(action)
         nom_rewards += nom_reward
@@ -109,7 +115,7 @@ if __name__ == '__main__':
     safe_policy_config = config.get('safety_policy', None)
     safe_policy_dict = load_policy(safe_policy_config, safe_env, device)
     nom_env_config = config.get('nominal_policy', None)
-    nom_policy_dict = load_policy(nom_env_config, nom_env, device)
+    nom_policy_dict = load_policy(nom_env_config, nom_env, device, safe_env=safe_env)
     
     if safe_env is None or safe_policy_dict is None:
         raise ValueError('Safe Env or Safe Policy not loaded properly')

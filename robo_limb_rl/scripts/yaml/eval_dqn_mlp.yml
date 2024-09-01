@@ -1,0 +1,12 @@
+seed: 1
+safe_env:
+    env_name: SafeLimbEnv-v0
+    config_path: yaml/safe_limb_env_discrete.yml
+    render_mode: None
+safety_policy:
+    policy_types: 
+        - QNet_MLP
+    policy_paths:
+        - ../policies/SafeLimbEnv-v0__online_s500000_reg_loss_1_layer_512__1__1725159015_online_s500000_reg_loss_1_layer_512.cleanrl_model
+    algo_type: DQN
+    reward_type: reg
