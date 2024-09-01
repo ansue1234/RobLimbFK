@@ -1,6 +1,6 @@
 # regular reward
 python online_dqn_mlp.py \
-       --exp-name "online_s500000_reg_loss" \
+       --exp-name "online_s500000_reg_loss_1_layer_512" \
        --track \
        --env-id "SafeLimbEnv-v0" \
        --wandb-project_name "soft_limb" \
