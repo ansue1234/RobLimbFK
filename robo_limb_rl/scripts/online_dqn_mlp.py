@@ -139,7 +139,8 @@ poetry run pip install "stable_baselines3==2.0.0a1"
     )
     assert isinstance(envs.single_action_space, gym.spaces.Discrete), "only discrete action space is supported"
 
-    q_network = QNet_MLP(envs, reward_type=args.reward_type).to(device)
+    reward_type = safety_env.reward_type
+    q_network = QNet_MLP(envs, reward_type=reward_type).to(device)
     optimizer = optim.Adam(q_network.parameters(), lr=args.learning_rate)
     target_network = QNet_MLP(envs, reward_type=args.reward_type).to(device)
     target_network.load_state_dict(q_network.state_dict())

@@ -9,7 +9,7 @@ import random
 
 class LimbEnv(gym.Env):
     metadata = {
-        "render_modes": ["human"],
+        "render_modes": ["human", None],
     }
     def __init__(self, config_path, render_mode='human', seed=None):
         super(LimbEnv, self).__init__()
