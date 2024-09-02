@@ -158,14 +158,14 @@ poetry run pip install "stable_baselines3==2.0.0a1"
     obs, _ = envs.reset(seed=args.seed)
     for global_step in tqdm(range(args.total_timesteps)):
         # ALGO LOGIC: put action logic here
-        # epsilon = linear_schedule(args.start_e, args.end_e, args.exploration_fraction * args.total_timesteps, global_step)
-        # if random.random() < epsilon:
-        #     actions = np.array([envs.single_action_space.sample() for _ in range(envs.num_envs)])
-        # else:
-        #     q_values = q_network(torch.Tensor(obs).to(device))
-        #     actions = torch.argmax(q_values, dim=1).cpu().numpy()
+        epsilon = linear_schedule(args.start_e, args.end_e, args.exploration_fraction * args.total_timesteps, global_step)
+        if random.random() < epsilon:
+            actions = np.array([envs.single_action_space.sample() for _ in range(envs.num_envs)])
+        else:
+            q_values = q_network(torch.Tensor(obs).to(device))
+            actions = torch.argmax(q_values, dim=1).cpu().numpy()
         # full exploration
-        actions = np.array([envs.single_action_space.sample() for _ in range(envs.num_envs)])
+        # actions = np.array([envs.single_action_space.sample() for _ in range(envs.num_envs)])
 
         # TRY NOT TO MODIFY: execute the game and log data.
         next_obs, rewards, terminations, truncations, infos = envs.step(actions)

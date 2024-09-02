@@ -1,5 +1,5 @@
 python online_dqn_mlp.py \
-       --exp-name "online_s250000_base_exp_ep200_full_exp" \
+       --exp-name "online_s250000_base_exp_ep500_simple_discrete" \
        --track \
        --env-id "SafeLimbEnv-v0" \
        --wandb-project_name "soft_limb" \
