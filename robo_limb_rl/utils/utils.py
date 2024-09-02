@@ -76,12 +76,12 @@ class DataLoader():
 
 
 class TrajReplayBuffer():
-    def __init__(self, max_size, state_dim, action_dim, device):
+    def __init__(self, max_size, state_dim, action_dim, seq_len, device):
         self.max_size = max_size
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.device = device
-        self.ptr = 0
+        self.seq_len = seq_len
         self.size = 0
         self.trajs = []
         self.trajs_next_states = []
@@ -90,6 +90,26 @@ class TrajReplayBuffer():
         self.dones = []
         self.current_traj = []
         self.current_traj_next_states = []
-
+    
     def add(self, state, next_state, action, reward, done):
+        self.current_traj.append(state)
+        self.current_traj_next_states.append(next_state)
+        self.actions.append(action)
+        self.rewards.append(reward)
+        self.dones.append(done)
+        if done:
+            self.trajs.append(self.current_traj)
+            self.trajs_next_states.append(self.current_traj_next_states)
+            self.current_traj = []
+            self.current_traj_next_states = []
+        if self.size < self.max_size:
+            self.size += 1
+        else:
+            self.trajs.pop(0)
+            self.trajs_next_states.pop(0)
+            self.actions.pop(0)
+            self.rewards.pop(0)
+            self.dones.pop(0)
+    
+    def sample(self):
         
