@@ -93,6 +93,7 @@ class LimbEnv(gym.Env):
         return self.data
     
     def reset(self, seed=None, options = None):
+        # print("resetting")
         if self.seed is not None:
             super().reset(seed=self.seed)
         else:
@@ -276,7 +277,9 @@ class SafeLimbEnv(LimbEnv):
         
     def step(self, action):
         self.t += 1
-        return super(SafeLimbEnv, self).step(action)
+        self.state, reward, done, truncated, info = super(SafeLimbEnv, self).step(action)
+        # print("truncated", truncated)
+        return self.state, reward, done, truncated, info
     
     def reset(self, seed=None, options=None):
         self.t = 0

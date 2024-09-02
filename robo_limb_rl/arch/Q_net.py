@@ -59,7 +59,10 @@ class QNet_LSTM(nn.Module):
             self.lam = lam
         self.reward_type = reward_type
         self.lstm = nn.LSTM(input_dim, 1024, 3, batch_first=True)
-        self.fc = nn.Linear(1024, output_dim)
+        self.fc = nn.Sequential(
+            nn.Linear(1024, 512),
+            nn.ReLU(),
+            nn.Linear(512, output_dim))
 
     def forward(self, x, hidden=None):
         if hidden:

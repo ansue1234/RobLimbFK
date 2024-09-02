@@ -1,10 +1,10 @@
 python sac_mlp.py \
-       --exp-name "sac_debugging" \
+       --exp-name "sac_250000" \
        --track \
        --env-id "SafeLimbEnv-v0" \
        --wandb-project_name "soft_limb" \
        --wandb-entity "gsue-research" \
-       --total-timesteps 500000 \
+       --total-timesteps 250000 \
        --buffer_size 10000 \
        --learning_starts 4096 \
        --batch_size 4096 \

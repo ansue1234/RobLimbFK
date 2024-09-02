@@ -13,7 +13,7 @@ import tyro
 from stable_baselines3.common.buffers import ReplayBuffer
 from torch.utils.tensorboard import SummaryWriter
 import gymnasium as gym
-from robo_limb_rl.arch.Q_net import QNet_MLP
+from robo_limb_rl.arch.Q_net import QNet_LSTM
 from robo_limb_rl.envs.limb_env import LimbEnv, SafeLimbEnv
 from tqdm import tqdm
 
@@ -78,7 +78,7 @@ class Args:
 
 def make_env(env_id, seed, config_path):
     def thunk():
-        env = gym.make(env_id, seed=seed, config_path=config_path, render_mode=None)
+        env = gym.make(env_id, seed, config_path=config_path, render_mode=None)
         env = gym.wrappers.RecordEpisodeStatistics(env)
         env.action_space.seed(seed)
         return env
@@ -135,14 +135,14 @@ poetry run pip install "stable_baselines3==2.0.0a1"
     # env setup
     safety_env = gym.make(args.env_id, seed=args.seed, config_path=args.env_config_path)
     envs = gym.vector.SyncVectorEnv(
-        [make_env(args.env_id, args.seed + i, config_path=args.env_config_path) for i in range(args.num_envs)],
+        [make_env(args.env_id, args.seed + i, config_path=args.env_config_path) for i in range(args.num_envs)]
     )
     assert isinstance(envs.single_action_space, gym.spaces.Discrete), "only discrete action space is supported"
 
     reward_type = safety_env.reward_type
-    q_network = QNet_MLP(envs, reward_type=reward_type).to(device)
+    q_network = QNet_LSTM(envs, reward_type=args.reward_type).to(device)
     optimizer = optim.Adam(q_network.parameters(), lr=args.learning_rate)
-    target_network = QNet_MLP(envs, reward_type=args.reward_type).to(device)
+    target_network = QNet_LSTM(envs, reward_type=args.reward_type).to(device)
     target_network.load_state_dict(q_network.state_dict())
 
     rb = ReplayBuffer(
@@ -158,21 +158,18 @@ poetry run pip install "stable_baselines3==2.0.0a1"
     obs, _ = envs.reset(seed=args.seed)
     for global_step in tqdm(range(args.total_timesteps)):
         # ALGO LOGIC: put action logic here
-        epsilon = linear_schedule(args.start_e, args.end_e, args.exploration_fraction * args.total_timesteps, global_step)
-        if random.random() < epsilon:
-            actions = np.array([envs.single_action_space.sample() for _ in range(envs.num_envs)])
-        else:
-            q_values = q_network(torch.Tensor(obs).to(device))
-            actions = torch.argmax(q_values, dim=1).cpu().numpy()
+        # epsilon = linear_schedule(args.start_e, args.end_e, args.exploration_fraction * args.total_timesteps, global_step)
+        # if random.random() < epsilon:
+        #     actions = np.array([envs.single_action_space.sample() for _ in range(envs.num_envs)])
+        # else:
+        #     q_values = q_network(torch.Tensor(obs).to(device))
+        #     actions = torch.argmax(q_values, dim=1).cpu().numpy()
         # full exploration
-        # actions = np.array([envs.single_action_space.sample() for _ in range(envs.num_envs)])
+        actions = np.array([envs.single_action_space.sample() for _ in range(envs.num_envs)])
 
         # TRY NOT TO MODIFY: execute the game and log data.
         next_obs, rewards, terminations, truncations, infos = envs.step(actions)
-        # print("dones", terminations, global_step)
-        # print("trunctaions", truncations, global_step)
-        # print("Obs", obs, global_step)
-        # print("Next Obs", next_obs, global_step)
+
         # TRY NOT TO MODIFY: record rewards for plotting purposes
         if "final_info" in infos:
             for info in infos["final_info"]:

@@ -3,6 +3,17 @@ from robo_limb_rl.envs.limb_env import LimbEnv, SafeLimbEnv
 from tqdm import tqdm
 import numpy as np
 
+def make_env(env_id, seed, config_path):
+    def thunk():
+        env = gym.make(env_id, seed=seed, config_path=config_path, render_mode=None)
+        print("env id", env_id)
+        print("config path", config_path)
+        print("env max steps", env.spec.max_episode_steps)
+        env = gym.wrappers.RecordEpisodeStatistics(env)
+        env.action_space.seed(seed)
+        return env
+    return thunk
+
 if __name__ == "__main__":
     
     nom_env = gym.make('LimbEnv-v0', config_path='../scripts/yaml/default_limb_env_discrete.yml', render_mode=None, seed=1)
@@ -16,7 +27,10 @@ if __name__ == "__main__":
     #         break
     # env.close()
     safe_env = gym.make('SafeLimbEnv-v0', config_path='../scripts/yaml/safe_limb_env_discrete.yml', render_mode=None, seed=1)
-
+    envs = gym.vector.SyncVectorEnv(
+        [make_env('SafeLimbEnv-v0', i, config_path='../scripts/yaml/safe_limb_env_simple_discrete.yml') for i in range(1)],
+    )
+    print("safe_env", safe_env.spec.max_episode_steps)
     _, _ = nom_env.reset()
     _, _ = safe_env.reset()
     nom_env.set_state(np.zeros(4).astype(np.float32))

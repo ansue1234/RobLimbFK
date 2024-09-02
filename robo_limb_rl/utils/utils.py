@@ -83,8 +83,13 @@ class TrajReplayBuffer():
         self.device = device
         self.ptr = 0
         self.size = 0
-        self.states = np.zeros((max_size, state_dim))
-        self.next_states = np.zeros((max_size, state_dim))
-        self.actions = np.zeros((max_size, action_dim))
-        self.rewards = np.zeros(max_size)
-        self.dones = np.zeros(max_size)
+        self.trajs = []
+        self.trajs_next_states = []
+        self.actions = []
+        self.rewards = []
+        self.dones = []
+        self.current_traj = []
+        self.current_traj_next_states = []
+
+    def add(self, state, next_state, action, reward, done):
+        
