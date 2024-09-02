@@ -14,6 +14,7 @@ from stable_baselines3.common.buffers import ReplayBuffer
 from torch.utils.tensorboard import SummaryWriter
 import gymnasium as gym
 from robo_limb_rl.arch.Q_net import QNet_LSTM
+from robo_limb_rl.utils.utils import TrajReplayBuffer
 from robo_limb_rl.envs.limb_env import LimbEnv, SafeLimbEnv
 from tqdm import tqdm
 
@@ -75,10 +76,12 @@ class Args:
     """the path to the yaml config of the environment"""
     reward_type: str = 'reg'
     """the type of reward function"""
+    seq_len: int = 50
+    """the length of the sequence"""
 
 def make_env(env_id, seed, config_path):
     def thunk():
-        env = gym.make(env_id, seed, config_path=config_path, render_mode=None)
+        env = gym.make(env_id, seed=seed, config_path=config_path, render_mode=None)
         env = gym.wrappers.RecordEpisodeStatistics(env)
         env.action_space.seed(seed)
         return env
@@ -123,7 +126,8 @@ poetry run pip install "stable_baselines3==2.0.0a1"
         "hyperparameters",
         "|param|value|\n|-|-|\n%s" % ("\n".join([f"|{key}|{value}|" for key, value in vars(args).items()])),
     )
-    os.makedirs(f"../policies/{run_name}")
+    if args.save_model:
+        os.makedirs(f"../policies/{run_name}")
     # TRY NOT TO MODIFY: seeding
     random.seed(args.seed)
     np.random.seed(args.seed)
@@ -145,27 +149,30 @@ poetry run pip install "stable_baselines3==2.0.0a1"
     target_network = QNet_LSTM(envs, reward_type=args.reward_type).to(device)
     target_network.load_state_dict(q_network.state_dict())
 
-    rb = ReplayBuffer(
-        args.buffer_size,
-        envs.single_observation_space,
-        envs.single_action_space,
-        device,
-        handle_timeout_termination=False,
-    )
+    rb = TrajReplayBuffer(args.buffer_size,
+                          envs.single_observation_space.shape,
+                          envs.single_action_space.n,
+                          args.seq_len,
+                          device)
     start_time = time.time()
 
     # TRY NOT TO MODIFY: start the game
     obs, _ = envs.reset(seed=args.seed)
+    obs_traj = torch.tensor(obs).to(torch.float32).to(device).unsqueeze(1)
+    
     for global_step in tqdm(range(args.total_timesteps)):
         # ALGO LOGIC: put action logic here
-        # epsilon = linear_schedule(args.start_e, args.end_e, args.exploration_fraction * args.total_timesteps, global_step)
-        # if random.random() < epsilon:
-        #     actions = np.array([envs.single_action_space.sample() for _ in range(envs.num_envs)])
-        # else:
-        #     q_values = q_network(torch.Tensor(obs).to(device))
-        #     actions = torch.argmax(q_values, dim=1).cpu().numpy()
+        obs_traj = torch.cat([obs_traj, torch.tensor(obs).to(torch.float32).to(device).unsqueeze(1)], dim=1)
+        if obs_traj.shape[1] > args.seq_len:
+            obs_traj = obs_traj[:, -args.seq_len:, :]
+        epsilon = linear_schedule(args.start_e, args.end_e, args.exploration_fraction * args.total_timesteps, global_step)
+        if random.random() < epsilon:
+            actions = np.array([envs.single_action_space.sample() for _ in range(envs.num_envs)])
+        else:
+            q_values = q_network(obs_traj)[0].to(device)
+            actions = torch.argmax(q_values, dim=1).cpu().numpy()
         # full exploration
-        actions = np.array([envs.single_action_space.sample() for _ in range(envs.num_envs)])
+        # actions = np.array([envs.single_action_space.sample() for _ in range(envs.num_envs)])
 
         # TRY NOT TO MODIFY: execute the game and log data.
         next_obs, rewards, terminations, truncations, infos = envs.step(actions)
@@ -183,23 +190,26 @@ poetry run pip install "stable_baselines3==2.0.0a1"
         for idx, trunc in enumerate(truncations):
             if trunc:
                 real_next_obs[idx] = infos["final_observation"][idx]
-        rb.add(obs, real_next_obs, actions, rewards, terminations, infos)
-
+        rb.add(obs.squeeze(), real_next_obs.squeeze(), actions[0], rewards[0], terminations[0])
+        
         # TRY NOT TO MODIFY: CRUCIAL step easy to overlook
         obs = next_obs
 
         # ALGO LOGIC: training.
-        if global_step > args.learning_starts:
+        # print(rb.size)
+        if global_step > args.learning_starts and rb.size > 0:
             if global_step % args.train_frequency == 0:
-                data = rb.sample(args.batch_size)
+                data = rb.sample()
                 with torch.no_grad():
-                    target_max, _ = target_network(data.next_observations).max(dim=1)
+                    # print("target Pred", target_pred.shape)
+                    target_max, _ = target_network(data.next_observations.unsqueeze(0))[0].max(dim=1)
                     if args.reward_type == 'reg':
-                        td_target = data.rewards.flatten() + args.gamma * target_max * (1 - data.dones.flatten())
+                        td_target = data.rewards + args.gamma * target_max * (1 - data.dones.int())
                     else:
-                        td_target = data.rewards.flatten() * target_max
-                        
-                old_val = q_network(data.observations).gather(1, data.actions).squeeze()
+                        td_target = data.rewards * target_max
+                
+                # print(q_network(data.observations.unsqueeze(0))[0].shape, data.actions.shape)
+                old_val = q_network(data.observations.unsqueeze(0))[0][:, data.actions]
                 loss = F.mse_loss(td_target, old_val)
 
                 states = safety_env.sample_states(args.batch_size)
@@ -207,8 +217,8 @@ poetry run pip install "stable_baselines3==2.0.0a1"
                 unsafe_states = states[is_unsafe].astype(np.float32)
                 unsafe_states = (
                     torch.from_numpy(unsafe_states).to(device).to(torch.float32)
-                )
-                unsafe_qval_pred = q_network(unsafe_states)
+                ).unsqueeze(1)
+                unsafe_qval_pred = q_network(unsafe_states)[0]
                 unsafe_val_pred = unsafe_qval_pred.max(dim=1)[0]
                 if args.reward_type == 'reg':
                     unsafe_val_true = (-1/(1-args.gamma))* torch.ones(
