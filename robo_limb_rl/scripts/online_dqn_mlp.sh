@@ -8,5 +8,5 @@ python online_dqn_mlp.py \
        --total-timesteps 250000 \
        --batch_size 4096 \
        --reward-type "reg" \
-       --env_config_path "../scripts/yaml/safe_limb_env_discrete.yml" \
+       --env_config_path "../scripts/yaml/safe_limb_env_simple_discrete.yml" \
        --save_model \

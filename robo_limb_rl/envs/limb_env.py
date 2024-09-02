@@ -51,6 +51,8 @@ class LimbEnv(gym.Env):
         
         if self.action_type == 'continuous':
             self.action_space = gym.spaces.Box(low=-10, high=10, shape=(2,))
+        elif self.action_type == 'simple_discrete':
+            self.action_space = gym.spaces.Discrete(4)
         else:
             self.action_space = gym.spaces.Discrete(441)
         self.observation_space = gym.spaces.Box(low=-self.theta_limit, high=self.theta_limit, shape=(4,))
@@ -103,11 +105,19 @@ class LimbEnv(gym.Env):
     
     def step(self, action):
         # prep data
-
         if self.action_type == 'continuous':
             if self.int_actions:
                 action = np.round(action)
             action = action.astype(np.float32)
+        elif self.action_type == 'simple_discrete':
+            if action == 0:
+                action = np.array([-10, -10]).astype(np.float32)
+            elif action == 1:
+                action = np.array([-10, 10]).astype(np.float32)
+            elif action == 2:
+                action = np.array([10, -10]).astype(np.float32)
+            else:
+                action = np.array([10, 10]).astype(np.float32)
         else:
             action = np.array([action//21 - 10, action%21 - 10]).astype(np.float32)
         
