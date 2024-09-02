@@ -1,11 +1,11 @@
 python sac_mlp.py \
-       --exp-name "sac_test" \
+       --exp-name "sac_debugging" \
        --track \
        --env-id "SafeLimbEnv-v0" \
        --wandb-project_name "soft_limb" \
        --wandb-entity "gsue-research" \
-       --total-timesteps 10 \
-       --buffer_size 50 \
-       --learning_starts 1 \
-       --batch_size 1 \
+       --total-timesteps 500000 \
+       --buffer_size 10000 \
+       --learning_starts 4096 \
+       --batch_size 4096 \
        --env_config_path "../scripts/yaml/safe_limb_env.yml" \

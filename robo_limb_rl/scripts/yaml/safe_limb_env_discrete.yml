@@ -14,7 +14,7 @@ int_actions: True
 dt: 0.075 # 75 ms
 theta_limit: 100
 goal_tolerance: 1
-safe_zone: 30
+safe_zone: 40
 gamma: 0.99
 alpha: 0.01
 reward_type: reg

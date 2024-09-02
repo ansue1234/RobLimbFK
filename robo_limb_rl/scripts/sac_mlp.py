@@ -195,9 +195,6 @@ poetry run pip install "stable_baselines3==2.0.0a1"
 
             qf1_a_values = qf1(data.observations, data.actions).view(-1)
             qf2_a_values = qf2(data.observations, data.actions).view(-1)
-            qf1_loss = F.mse_loss(qf1_a_values, next_q_value)
-            qf2_loss = F.mse_loss(qf2_a_values, next_q_value)
-            qf_loss = qf1_loss + qf2_loss
 
             # supervized Loss
             states = safety_env.sample_states(data.observations.shape[0])
@@ -206,10 +203,13 @@ poetry run pip install "stable_baselines3==2.0.0a1"
             unsafe_states = (
                 torch.from_numpy(unsafe_states).to(device).to(torch.float32)
             )
+            
             pred_acts_qf1, _, _ = actor.get_action(unsafe_states)
             pred_acts_qf2, _, _ = actor.get_action(unsafe_states)
             unsafe_qf1_pred = qf1(unsafe_states, pred_acts_qf1)
             unsafe_qf2_pred = qf2(unsafe_states, pred_acts_qf2)
+            # print(pred_acts_qf1)
+            # print(unsafe_qf1_pred)
             if reward_type == "reg":
                 unsafe_qf1_true = (-1/(1-args.gamma)) * torch.ones(
                     unsafe_qf1_pred.shape, device=device, dtype=torch.float32

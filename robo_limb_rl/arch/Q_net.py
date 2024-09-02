@@ -75,7 +75,7 @@ class QNet_LSTM(nn.Module):
         return out, (h_n, c_n)
 
 class SoftQNetwork(nn.Module):
-    def __init__(self, env=None, input_dim=None, output_dim=None, gamma=0.99, lam=0.01, reward_type='reg'):
+    def __init__(self, env=None, input_dim=None, output_dim=None, gamma=0.99, lam=0.01, reward_type='reg', seed=1):
         super().__init__()
         if input_dim is None:
             input_dim = np.array(env.single_observation_space.shape).prod()
@@ -86,17 +86,20 @@ class SoftQNetwork(nn.Module):
         else:
             self.lam = lam
         self.reward_type = reward_type
-        self.fc1 = nn.Linear(input_dim + output_dim, 512)
-        self.fc2 = nn.Linear(512, 512)
-        self.fc3 = nn.Linear(512, 256)
-        self.fc4 = nn.Linear(256, 1)
-
+        self.network = nn.Sequential(
+            nn.Linear(input_dim + output_dim, 512),
+            nn.ReLU(),
+            nn.Linear(512, 512),
+            nn.Tanh(),
+            nn.Linear(512, 512),
+            nn.ReLU(),
+            nn.Linear(512, 1),
+        )
+        
     def forward(self, x, a):
         x = torch.cat([x, a], 1)
-        x = F.elu(self.fc1(x))
-        x = F.elu(self.fc2(x))
-        x = F.elu(self.fc3(x))
-        x = self.fc4(x)
+        x = self.network(x)
+        # print(x)
         if self.reward_type == 'reg':
             x = (1/(1-self.gamma))*torch.tanh(x)
         elif self.reward_type == 'e_exp':

@@ -123,7 +123,7 @@ poetry run pip install "stable_baselines3==2.0.0a1"
         "hyperparameters",
         "|param|value|\n|-|-|\n%s" % ("\n".join([f"|{key}|{value}|" for key, value in vars(args).items()])),
     )
-
+    os.makedirs(f"../policies/{run_name}")
     # TRY NOT TO MODIFY: seeding
     random.seed(args.seed)
     np.random.seed(args.seed)
@@ -158,12 +158,14 @@ poetry run pip install "stable_baselines3==2.0.0a1"
     obs, _ = envs.reset(seed=args.seed)
     for global_step in tqdm(range(args.total_timesteps)):
         # ALGO LOGIC: put action logic here
-        epsilon = linear_schedule(args.start_e, args.end_e, args.exploration_fraction * args.total_timesteps, global_step)
-        if random.random() < epsilon:
-            actions = np.array([envs.single_action_space.sample() for _ in range(envs.num_envs)])
-        else:
-            q_values = q_network(torch.Tensor(obs).to(device))
-            actions = torch.argmax(q_values, dim=1).cpu().numpy()
+        # epsilon = linear_schedule(args.start_e, args.end_e, args.exploration_fraction * args.total_timesteps, global_step)
+        # if random.random() < epsilon:
+        #     actions = np.array([envs.single_action_space.sample() for _ in range(envs.num_envs)])
+        # else:
+        #     q_values = q_network(torch.Tensor(obs).to(device))
+        #     actions = torch.argmax(q_values, dim=1).cpu().numpy()
+        # full exploration
+        actions = np.array([envs.single_action_space.sample() for _ in range(envs.num_envs)])
 
         # TRY NOT TO MODIFY: execute the game and log data.
         next_obs, rewards, terminations, truncations, infos = envs.step(actions)
@@ -242,10 +244,15 @@ poetry run pip install "stable_baselines3==2.0.0a1"
 
         if args.save_model and global_step % 100000 == 0:
             model_path = f"runs/{run_name}/{args.exp_name}.cleanrl_model"
-            m_p = f"../policies/{run_name}_{args.exp_name}.cleanrl_model"
+            m_p = f"../policies/{run_name}/{args.exp_name}.cleanrl_model"
             torch.save(q_network.state_dict(), model_path)
             torch.save(q_network.state_dict(), m_p)
             print(f"model saved to {model_path}")
-
+    if args.save_model:
+        model_path = f"runs/{run_name}/{args.exp_name}.cleanrl_model"
+        m_p = f"../policies/{run_name}/{args.exp_name}.cleanrl_model"
+        torch.save(q_network.state_dict(), model_path)
+        torch.save(q_network.state_dict(), m_p)
+        print(f"model saved to {model_path}")
     envs.close()
     writer.close()

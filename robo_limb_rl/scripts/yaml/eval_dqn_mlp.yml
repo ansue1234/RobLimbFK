@@ -7,6 +7,6 @@ safety_policy:
     policy_types: 
         - QNet_MLP
     policy_paths:
-        - ../policies/SafeLimbEnv-v0__online_s500000_reg_loss__1__1724976474_online_s500000_reg_loss.cleanrl_model
+        - ../policies/SafeLimbEnv-v0__online_s500000_reg_loss_ep200__1__1725290195/online_s500000_reg_loss_ep200.cleanrl_model
     algo_type: DQN
     reward_type: reg
