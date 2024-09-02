@@ -123,22 +123,24 @@ if __name__ == '__main__':
         print('Nominal Env or Nominal Policy not loaded properly')
         print('Using Random Policy')
         nom_env = load_env(safe_env_config, seed)
-    ep_len = 0
+    num_passed_episodes = 0
     total_rewards = 0
-    max_steps = config.get('max_steps', 1000)
+    max_steps = config.get('max_steps', 200)
     num_rollouts = config.get('num_rollouts', 100)
     for i in tqdm(range(num_rollouts)):
         steps, rewards = rollout(safe_env, nom_env, safe_policy_dict, nom_policy_dict, device, max_steps=max_steps, seed=i)
-        ep_len += steps
+        if steps >= max_steps:
+            num_passed_episodes += 1
         total_rewards += rewards
         # print(f'Rollout {i}: Steps: {steps}, Rewards: {rewards}')
     print('With Intervention:')
-    print(f'Success Rate:{ep_len//max_steps}/{num_rollouts}, Avg Rewards: {total_rewards/num_rollouts}')
+    print(f'Success Rate:{num_passed_episodes}/{num_rollouts}, Avg Rewards: {total_rewards/num_rollouts}')
     
     # ep_len = 0
     # total_rewards = 0
     # for i in tqdm(range(num_rollouts)):
     #     steps, rewards = rollout(safe_env, nom_env, safe_policy_dict, nom_policy_dict, device, max_steps=max_steps, seed=i, intervention=False)
+    #     print('steps', steps)
     #     ep_len += steps
     #     total_rewards += rewards
     # print('Without Intervention:')
