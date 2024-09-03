@@ -21,7 +21,7 @@ python online_dqn_lstm.py \
        --wandb-project_name "soft_limb" \
        --wandb-entity "gsue-research" \
        --total-timesteps 100000 \
-       --buffer_size 10000 \
+       --buffer_size 50000 \
        --batch-size 4096 \
        --learning_starts 4096 \
        --reward-type "base_exp" \
