@@ -67,7 +67,7 @@ class Args:
 
 def make_env(env_id, seed, config_path):
     def thunk():
-        env = gym.make(env_id, seed, config_path=config_path, render_mode=None)
+        env = gym.make(env_id, seed=seed, config_path=config_path, render_mode=None)
         env = gym.wrappers.RecordEpisodeStatistics(env)
         env.action_space.seed(seed)
         return env
