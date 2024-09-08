@@ -25,7 +25,7 @@ class Predictor(Node):
                 ('model_type', 'LSTM'),
                 ('vel', False),
                 ('no_time', False),
-                ('freq', 20),
+                ('freq', 15),
                 ('rollout', True),
                 ('results_path', '')
             ]
@@ -47,7 +47,7 @@ class Predictor(Node):
         self.actual_state_publisher_ = self.create_publisher(State, 'actual_state', 1)
         self.pred_publisher_ = self.create_publisher(State, 'pred_state', 1)
         self.thr_publisher_ = self.create_publisher(Throttle, 'throttle', 1)
-        self.act_subscriber_ = self.create_subscription(Throttle, 'raw_throttle', self.throttle_listener_callback, 100)
+        self.act_subscriber_ = self.create_subscription(Throttle, 'raw_throttle', self.throttle_listener_callback, 10)
         self.angle_subscriber_ = self.create_subscription(Angles, 'limb_angles', self.angle_listener_callback, 2)
         
         self.freq = self.get_parameter('freq').get_parameter_value().integer_value
@@ -139,6 +139,7 @@ class Predictor(Node):
             
     def _prep_input(self, init=False):
         thr = self._get_throttle()
+        thr = (thr[0]*10, thr[1]*10)
         if self.no_time:
             curr_input = torch.tensor([*self._get_state(init=init), *thr]).to(device=self.device)
         else:
@@ -159,8 +160,8 @@ class Predictor(Node):
     def throttle_listener_callback(self, msg):
         thr_x = msg.throttle_x
         thr_y = msg.throttle_y
-        if len(self.throttle_queue) != 0:
-            self.throttle_queue.pop(0)
+        # if len(self.throttle_queue) != 0:
+        #     self.throttle_queue.pop(0)
         self.throttle_queue.append((thr_x, thr_y))
 
     # stores the newest received angles
@@ -252,7 +253,6 @@ def main(args=None):
     # Destroy the node explicitly
     # (optional - otherwise it will be done automatically
     # when the garbage collector destroys the node object)
-    predictor.serial.close()
     predictor.destroy_node()
     rclpy.shutdown()
 

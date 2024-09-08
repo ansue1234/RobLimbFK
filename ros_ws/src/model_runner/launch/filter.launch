@@ -1,0 +1,10 @@
+<!-- example.launch.xml -->
+
+<launch>
+  <node pkg="model_runner" exec="filter" name="filter">
+    <param name="policy_path" value="/home/ansue1234/Research/SML/RobLimbFK/robo_limb_rl/policies/SafeLimbEnv-v0__online_s500000_reg_loss_simple_discrete__1__1725314637/online_s500000_reg_loss_simple_discrete.cleanrl_model"/>
+    <param name="results_path" value="/home/ansue1234/Research/SML/RobLimbFK/ros_ws/src/pos_rec/"/>
+    <param name="threshold" value="90"/>
+  </node>
+  <!-- perform remap so both turtles listen to the same command topic -->
+</launch>

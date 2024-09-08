@@ -22,7 +22,9 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'pred = model_runner.fk_predictor:main'
+            'pred = model_runner.fk_predictor:main',
+            'looper=model_runner.open_loop_input_traj:main',
+            'filter=model_runner.filter:main'
         ],
     },
 )
