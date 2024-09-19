@@ -24,7 +24,8 @@ setup(
         'console_scripts': [
             'pred = model_runner.fk_predictor:main',
             'looper=model_runner.open_loop_input_traj:main',
-            'filter=model_runner.filter:main'
+            'filter=model_runner.filter:main',
+            'visualizer=model_runner.visualizer:main',
         ],
     },
 )

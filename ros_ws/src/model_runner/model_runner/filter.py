@@ -165,7 +165,7 @@ class PolicyFilter(Node):
             self.curr_state.vel_x = 0.0
             self.curr_state.vel_y = 0.0
             
-        self.result_file.write(f"Actual, {self.curr_state.theta_x}, {self.curr_state.theta_y}, {self.curr_state.vel_x}, {self.curr_state.vel_y}\n")
+        self.result_file.write(f"Actual, {self.curr_state.theta_x}, {self.curr_state.theta_y}, {self.curr_state.vel_x}, {self.curr_state.vel_y}, {curr_time.nanoseconds*1e-9}\n")
         self.curr_ang = curr_angle
         self.curr_time = curr_time
     
