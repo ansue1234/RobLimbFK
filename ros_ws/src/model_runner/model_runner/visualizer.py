@@ -6,6 +6,9 @@ from rclpy.node import Node
 from interfaces.msg import Angles
 from robo_limb_rl.arch.Q_net import QNet_MLP
 from matplotlib import pyplot as plt
+import matplotlib
+import numpy as np
+matplotlib.rc('font',family='Times New Roman')
 
 class Visualizer(Node):
     # This node receives throttle and then relays the throttle to the arduino
@@ -16,15 +19,16 @@ class Visualizer(Node):
 
         # Retrieve the parameters
         self.angle_subscriber_ = self.create_subscription(Angles, 'limb_angles', self.angle_listener_callback, 1)
-        self.fig, self.ax = plt.subplots()
+        self.fig, self.ax = plt.subplots(figsize=(5, 5))
         self.ax.set_xlim(-100, 100)
         self.ax.set_ylim(-100, 100)
-        self.ax.set_xlabel('X Angle (degrees)')
-        self.ax.set_ylabel('Y Angle (degrees)')
-        self.ax.set_title('Live State Visualization')
+        # self.ax.set_xlabel('X Bending Angle ($\theta_x$ degrees)', fontsize=28)
+        # self.ax.set_ylabel('Y Bending Angle ($\theta_y$ degrees)', fontsize=28)
+        # self.ax.set_title('Live State Visualization', fontsize=34)
         self.current_x, self.current_y = [], []
-        self.line, = self.ax.plot(self.current_x, self.current_y, 'b-', markersize=10)
-        self.scatter = self.ax.scatter([], [], c='purple', s=100)
+        self.line, = self.ax.plot(self.current_x, self.current_y, 'b-', markersize=10, linewidth=4, label='Traj.')
+        self.scatter = self.ax.scatter([], [], c='purple', s=100, label='Limb Pos.')
+        self.ax.plot(30*np.cos(np.linspace(0, 2*np.pi, 100)), 30*np.sin(np.linspace(0, 2*np.pi, 100)), 'g', label='Safe Bound.', linewidth=3)
         plt.draw()
         plt.pause(0.0001)
         
