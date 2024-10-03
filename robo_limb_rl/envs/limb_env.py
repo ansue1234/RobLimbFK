@@ -99,7 +99,7 @@ class LimbEnv(gym.Env):
         else:
             super().reset(seed=seed)
         self.state = self.np_random.uniform(-60, 60, 4).astype(np.float32)
-        self.goal = self.np_random.uniform(-60, 60, 2,).astype(np.float32)
+        self.goal = self.np_random.uniform(-80, 80, 2,).astype(np.float32)
         first_data_entry = np.concatenate((self.state, np.array([0.0, 0.0])), dtype=np.float32)
         self.data = torch.tensor(first_data_entry).to(self.device).unsqueeze(0)
         return self.state, {}
@@ -162,7 +162,7 @@ class LimbEnv(gym.Env):
         if self.render_mode == "human":
             self.render()
     
-        return self.state, reward, done, False, {} 
+        return np.append(self.state, self.goal), reward, done, False, {} 
     
     def render(self):
         if self.render_mode == 'human':
@@ -277,8 +277,9 @@ class SafeLimbEnv(LimbEnv):
         
     def step(self, action):
         self.t += 1
-        self.state, reward, done, truncated, info = super(SafeLimbEnv, self).step(action)
+        state, reward, done, truncated, info = super(SafeLimbEnv, self).step(action)
         # print("truncated", truncated)
+        self.state = state[:-2]
         return self.state, reward, done, truncated, info
     
     def reset(self, seed=None, options=None):
