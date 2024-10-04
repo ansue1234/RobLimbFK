@@ -55,7 +55,7 @@ class LimbEnv(gym.Env):
             self.action_space = gym.spaces.Discrete(4)
         else:
             self.action_space = gym.spaces.Discrete(441)
-        self.observation_space = gym.spaces.Box(low=-self.theta_limit, high=self.theta_limit, shape=(4,))
+        self.observation_space = gym.spaces.Box(low=-self.theta_limit, high=self.theta_limit, shape=(6,))
         if seed:
             self.action_space.seed(seed)
             self.observation_space.seed(seed)
@@ -102,7 +102,7 @@ class LimbEnv(gym.Env):
         self.goal = self.np_random.uniform(-80, 80, 2,).astype(np.float32)
         first_data_entry = np.concatenate((self.state, np.array([0.0, 0.0])), dtype=np.float32)
         self.data = torch.tensor(first_data_entry).to(self.device).unsqueeze(0)
-        return self.state, {}
+        return np.append(self.state, self.goal), {}
     
     def step(self, action):
         # prep data
