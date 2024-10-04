@@ -14,7 +14,7 @@ import tyro
 from stable_baselines3.common.buffers import ReplayBuffer
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
-import robo_limb_rl.envs
+from robo_limb_rl.envs.limb_env import LimbEnv
 
 @dataclass
 class Args:
@@ -68,7 +68,7 @@ class Args:
     """noise clip parameter of the Target Policy Smoothing Regularization"""
 
 
-def make_env(env_id, seed, config_path="./yaml/default_limb_env.yml"):
+def make_env(env_id, seed, idx, capture_video, run_name, config_path="./yaml/default_limb_env.yml"):
     def thunk():
         env = gym.make(env_id, seed=seed, config_path=config_path, render_mode=None)
         env = gym.wrappers.RecordEpisodeStatistics(env)
@@ -169,7 +169,7 @@ if __name__ == "__main__":
         handle_timeout_termination=False,
     )
     start_time = time.time()
-
+    os.makedirs(f"../policies/{run_name}")
     # TRY NOT TO MODIFY: start the game
     obs, _ = envs.reset(seed=args.seed)
     for global_step in tqdm(range(args.total_timesteps)):

@@ -13,7 +13,7 @@ import tyro
 from torch.distributions.normal import Normal
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
-import robo_limb_rl.envs
+from robo_limb_rl.envs.limb_env import LimbEnv
 
 
 @dataclass
@@ -194,7 +194,7 @@ if __name__ == "__main__":
     next_obs, _ = envs.reset(seed=args.seed)
     next_obs = torch.Tensor(next_obs).to(device)
     next_done = torch.zeros(args.num_envs).to(device)
-
+    os.makedirs(f"../policies/{run_name}")
     for iteration in tqdm(range(1, args.num_iterations + 1)):
         # Annealing the rate if instructed to do so.
         if args.anneal_lr:

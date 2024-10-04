@@ -14,7 +14,7 @@ import tyro
 from stable_baselines3.common.buffers import ReplayBuffer
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
-import robo_limb_rl.envs
+from robo_limb_rl.envs.limb_env import LimbEnv
 
 @dataclass
 class Args:
@@ -64,7 +64,7 @@ class Args:
     """automatic tuning of the entropy coefficient"""
 
 
-def make_env(env_id, seed, config_path="./yaml/default_limb_env.yml"):
+def make_env(env_id, seed, idx, capture_video, run_name, config_path="./yaml/default_limb_env.yml"):
     def thunk():
         env = gym.make(env_id, seed=seed, config_path=config_path, render_mode=None)
         env = gym.wrappers.RecordEpisodeStatistics(env)
@@ -196,7 +196,7 @@ if __name__ == "__main__":
         handle_timeout_termination=False,
     )
     start_time = time.time()
-
+    os.makedirs(f"../policies/{run_name}")
     # TRY NOT TO MODIFY: start the game
     obs, _ = envs.reset(seed=args.seed)
     for global_step in tqdm(range(args.total_timesteps)):
@@ -288,7 +288,7 @@ if __name__ == "__main__":
                 writer.add_scalar("losses/qf_loss", qf_loss.item() / 2.0, global_step)
                 writer.add_scalar("losses/actor_loss", actor_loss.item(), global_step)
                 writer.add_scalar("losses/alpha", alpha, global_step)
-                print("SPS:", int(global_step / (time.time() - start_time)))
+                # print("SPS:", int(global_step / (time.time() - start_time)))
                 writer.add_scalar("charts/SPS", int(global_step / (time.time() - start_time)), global_step)
                 if args.autotune:
                     writer.add_scalar("losses/alpha_loss", alpha_loss.item(), global_step)
