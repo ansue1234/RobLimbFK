@@ -94,12 +94,13 @@ class LimbEnv(gym.Env):
     
     def reset(self, seed=None, options = None):
         # print("resetting")
-        if self.seed is not None:
-            super().reset(seed=self.seed)
-        else:
-            super().reset(seed=seed)
+        # if self.seed is not None:
+        #     super().reset(seed=self.seed)
+        # else:
+        super().reset(seed=seed)
         self.state = self.np_random.uniform(-60, 60, 4).astype(np.float32)
         self.goal = self.np_random.uniform(-80, 80, 2,).astype(np.float32)
+        # print("Goal:", self.goal)
         first_data_entry = np.concatenate((self.state, np.array([0.0, 0.0])), dtype=np.float32)
         self.data = torch.tensor(first_data_entry).to(self.device).unsqueeze(0)
         return np.append(self.state, self.goal), {}
