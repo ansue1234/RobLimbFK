@@ -70,14 +70,14 @@ def rollout(safe_env, nom_env, safe_policy_dict, nom_policy_dict, device, max_st
     ep_len = 0
     ep_ended = False
     for i in tqdm(range(max_steps)):
-        action = safe_env.action_space.sample()  # Sample a random action
-        # safe_action, safe_q_val = get_action(safe_policy_dict, safe_obs, device)
-        # nom_action, _ = get_action(nom_policy_dict, nom_obs, device)
-        # if safe_q_val > 0 and intervention:
-        #     action = safe_action
-        # else:
-        #     action = nom_action
-        # action = torch.tensor(action).to(torch.float32)
+        # action = safe_env.action_space.sample()  # Sample a random action
+        safe_action, safe_q_val = get_action(safe_policy_dict, safe_obs, device)
+        nom_action, _ = get_action(nom_policy_dict, nom_obs, device)
+        if safe_q_val > 0 and intervention:
+            action = safe_action
+        else:
+            action = nom_action
+        action = torch.tensor(action).to(torch.float32)
         safe_obs, _, safe_done, _, _ = safe_env.step(action)
         nom_obs, nom_reward, _, _, _ = nom_env.step(action)
         nom_rewards += nom_reward
