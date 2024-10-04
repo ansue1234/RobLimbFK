@@ -84,7 +84,8 @@ def rollout(model_path,
     if 'raw' in model_path_lower:
         vel = False
         no_time = True
-    
+    vel = True
+    no_time = True
     if model_type == 'LSTM':
         model = FK_LSTM(input_size=input_size,
                 hidden_size=hidden_size,

@@ -27,24 +27,27 @@ for file in tqdm(files):
     # skip RNN and MLP
     if 'rnn' in file_lower or 'mlp' in file_lower:
         continue
-    if 'new' not in file_lower or 'time' not in file_lower:
+    if 'blue_no_cool_down_25k' not in file_lower:
         continue
+    # if 'new' not in file_lower or 'time' not in file_lower:
+    #     continue
     # if 'vel' not in file_lower and 'no_time' not in file_lower:
     #     continue
     # if 'raw' not in file_lower:
     #     continue
     input_size = 6
-    if 'vel' in file_lower:
-        input_size = 8
-    if 'raw' in file_lower:
-        input_size = 4
+    # if 'vel' in file_lower:
+    #     input_size = 8
+    # if 'raw' in file_lower:
+    #     input_size = 4
     
     print("input shape", input_size)
-    test_data_path = '../ml_data/test_data.csv'
-    if 'finetune' in file_lower:
-        test_data_path = '../ml_data/purple_test_data.csv'
-    if 'cool' in file_lower or 'new' in file_lower:
-        test_data_path = '../ml_data/purple_no_cool_down_test_data.csv'
+    # test_data_path = '../ml_data/test_data.csv'
+    # if 'finetune' in file_lower:
+    #     test_data_path = '../ml_data/purple_test_data.csv'
+    # if 'cool' in file_lower or 'new' in file_lower:
+    #     test_data_path = '../ml_data/purple_no_cool_down_test_data.csv'
+    test_data_path = '../ml_data/blue_no_cool_down_test_data.csv'
     print(test_data_path)
     filename = '../model_weights/new_weights/' + file
     print('File', file)
@@ -58,11 +61,11 @@ for file in tqdm(files):
                                                   device)
     fig = viz_graph(outputs_df, test_df, file, show_end=True)
     
-    with open("../results/"+file+".txt", 'w') as f:
+    with open("../results/oct_4/"+file+".txt", 'w') as f:
         f.write("RMSE: " + str(rmse.item()) + '\n')
         f.write("R^2: " + str(r2_score.item()))
-    outputs_df.to_csv("../results/outputs_"+file+".csv")
-    test_df.to_csv("../results/test_"+file+".csv")
+    outputs_df.to_csv("../results/oct_4/outputs/outputs_"+file+".csv")
+    test_df.to_csv("../results/oct_4/test/test_"+file+".csv")
     
-    fig.savefig("../results/"+file+".jpg")
+    fig.savefig("../results/oct_4/"+file+".jpg")
     fig.show()

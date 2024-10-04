@@ -97,12 +97,20 @@ if __name__ == "__main__":
     print(args.prob_layer)
     print("model type", args.model_type)
     print("attn", args.attention)
+    input_features = ['theta_x',
+                      'theta_y',
+                      'vel_x',
+                      'vel_y',
+                      'X_throttle',
+                      'Y_throttle']
+    
     train_data_loader = DataLoader(file_path=args.train_data_path,
                                    batch_size=args.batch_size,
                                    device=device,
                                    predict_len=args.predict_len,
                                    seq_len=args.seq_len,
                                    num_samples=args.num_samples,
+                                   input_features=input_features,
                                    pad=True)
     test_data_loader = DataLoader(file_path=args.test_data_path,
                                   batch_size=args.batch_size,
@@ -110,6 +118,7 @@ if __name__ == "__main__":
                                   predict_len=args.predict_len,
                                   num_samples=-1,
                                   seq_len=args.seq_len,
+                                  input_features=input_features,
                                   pad=True)
     input_size = train_data_loader.input_dim
     hidden_size = args.hidden_size
