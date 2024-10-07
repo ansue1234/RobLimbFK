@@ -19,7 +19,7 @@ class LimbEnv(gym.Env):
         
         self.model_path = config.get('model_path', "")
         self.model_type = config.get('model_type', "SEQ2SEQ")
-        self.viz_type = config.get('viz_type', 'scatter')
+        self.viz_type = config.get('viz_type', 'line')
         self.input_dim = config.get('input_dim', 6)
         self.output_dim = config.get('output_dim', 4)
         self.hidden_dim = config.get('hidden_dim', 512)
@@ -68,12 +68,14 @@ class LimbEnv(gym.Env):
         self.ax.set_xlabel('X Angle (degrees)')
         self.ax.set_ylabel('Y Angle (degrees)')
         self.ax.set_title('Live State Visualization')
-        
+        self.x_path = []
+        self.y_path = []
         # Initialize scatter plot
         if self.viz_type == 'scatter':
             self.scatter = self.ax.scatter([], [], c='blue', s=100)  # 's' is the size of the scatter points
         elif self.viz_type == 'line':
-            self.line, = self.ax.plot([], [], 'r-', markersize=10)
+            self.scatter = self.ax.scatter([], [], c='blue', s=100)
+            self.line, = self.ax.plot(self.x_path, self.y_path, 'r-', markersize=10)
         
         self.goal_plot = self.ax.scatter(self.goal[0], self.goal[1], c='red', s=100, marker='x')  # Goal marker
 
@@ -171,8 +173,11 @@ class LimbEnv(gym.Env):
             if self.viz_type == 'scatter':
                 self.scatter.set_offsets([self.state[0], self.state[1]])
             elif self.viz_type == 'line':
-                self.line.set_xdata([self.state[0]])
-                self.line.set_ydata([self.state[1]])
+                self.scatter.set_offsets([self.state[0], self.state[1]])
+                self.x_path.append(self.state[0])
+                self.y_path.append(self.state[1])
+                self.line.set_xdata(self.x_path)
+                self.line.set_ydata(self.y_path)
             self.goal_plot.set_offsets([self.goal[0], self.goal[1]])
             self.ax.relim()
             self.ax.autoscale_view()
