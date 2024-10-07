@@ -38,17 +38,27 @@ def prep_inputs(prev_inputs, outputs, throttles):
 def get_loss(data_loader, model, hn, cn, prev_setnum, loss_fn, optimizer, mode="train", state='stateful', rollout=True):
     if rollout:
         inputs, targets, throttle, set_num = data_loader.get_batch_rollout()
-        outputs, out_cn, out_hn = model(inputs, hn.detach(), cn.detach(), prob=args.prob_layer)
-        loss = loss_fn(outputs, targets[:, 0, :].unsqueeze(1).detach())
-        rollout_input = prep_inputs(inputs[:, 1:, :], outputs, throttle[:, 0, :].unsqueeze(1))
-        pred_outputs = outputs
-        for i in range(2, targets.shape[1]):
-            outputs, out_cn, out_hn = model(rollout_input, out_hn, out_cn, prob=args.prob_layer)
-            pred_outputs = torch.cat((pred_outputs, outputs), dim=1)
+        # outputs, out_cn, out_hn = model(inputs, hn.detach(), cn.detach(), prob=args.prob_layer)
+        # loss = loss_fn(outputs, targets[:, 0, :].unsqueeze(1).detach())
+        # rollout_input = prep_inputs(inputs[:, 1:, :], outputs, throttle[:, 0, :].unsqueeze(1))
+        out_hn, out_cn = hn.detach(), cn.detach()
+        pred_outputs = torch.zeros_like(targets).to(device)
+        pred_step = torch.zeros_like(inputs[:, 0, :]).to(device)
+        rollout_input = inputs
+        loss = None
+        for i in range(0, targets.shape[1] - 1):
+            outputs, out_cn, out_hn = model(rollout_input.detach(), out_hn, out_cn, prob=args.prob_layer)
+            pred_outputs[:, i, :] = outputs[:, -1, :].clone()
             # print(pred_outputs.shape)
             # print(targets[:, :i, :].shape)
-            loss += loss_fn(pred_outputs, targets[:, :i, :].detach())
-            rollout_input = prep_inputs(rollout_input[:, 1:, :], outputs[:, -1, :].unsqueeze(1), throttle[:, i, :].unsqueeze(1))
+            if loss:
+                loss += loss_fn(pred_outputs[:, :i + 1, :].clone(), targets[:, :i + 1, :].detach())
+            else:
+                loss = loss_fn(pred_outputs[:, :i + 1, :].clone(), targets[:, :i + 1, :].detach())
+            pred_step[:, :-2] = pred_outputs[:, i, :].clone() + inputs[:, i, :-2]
+            pred_step[:,  -2:] = throttle[:, i, :]
+            rollout_input[:, :-1, :] = rollout_input[:, 1:, :]
+            rollout_input[:, -1:, :] = pred_step.unsqueeze(1)
     else:
         inputs, targets, set_num = data_loader.get_batch()
         # print(inputs.shape)
