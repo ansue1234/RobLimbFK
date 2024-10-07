@@ -1,9 +1,17 @@
 
-python train_RNN.py --epochs 10 \
-                     --batch_size 512 \
-                     --exp_name testing_RNN \
-                     --seq_len 5 \
-                     --state stateless
+python train_LSTM.py --epochs 2 \
+                     --batch_size 10 \
+                     --num_samples 25001 \
+                     --exp_name test_rollout\
+                     --train_data_path ../ml_data/purple_no_cool_down_train_data.csv \
+                     --test_data_path ../ml_data/purple_no_cool_down_test_data.csv \
+                     --seq_len 50 \
+                     --predict_len 40 \
+                     --vel true \
+                     --no_time true \
+                     --seed 1 \
+
+
 
 
 # python train.py --epochs 200 \

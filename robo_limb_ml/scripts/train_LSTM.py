@@ -29,15 +29,34 @@ parser.add_argument('--vel', type=bool, default=False)
 parser.add_argument('--no_time', type=bool, default=False)
 args = parser.parse_args()
 
+def prep_inputs(prev_inputs, outputs, throttles):
+    next_step = torch.cat((outputs, throttles), dim=2)
+    inputs = torch.cat((prev_inputs[:, 1:, :], next_step), dim=1)
+    return inputs
 
-def get_loss(data_loader, model, hn, cn, prev_setnum, loss_fn, optimizer, mode="train", state='stateful'):
-    inputs, targets, set_num = data_loader.get_batch()
+
+def get_loss(data_loader, model, hn, cn, prev_setnum, loss_fn, optimizer, mode="train", state='stateful', rollout=True):
+    if rollout:
+        inputs, targets, throttle, set_num = data_loader.get_batch_rollout()
+        outputs, out_cn, out_hn = model(inputs, hn.detach(), cn.detach(), prob=args.prob_layer)
+        loss = loss_fn(outputs, targets[:, 0, :].unsqueeze(1).detach())
+        rollout_input = prep_inputs(inputs[:, 1:, :], outputs, throttle[:, 0, :].unsqueeze(1))
+        pred_outputs = outputs
+        for i in range(2, targets.shape[1]):
+            outputs, out_cn, out_hn = model(rollout_input, out_hn, out_cn, prob=args.prob_layer)
+            pred_outputs = torch.cat((pred_outputs, outputs), dim=1)
+            # print(pred_outputs.shape)
+            # print(targets[:, :i, :].shape)
+            loss += loss_fn(pred_outputs, targets[:, :i, :].detach())
+            rollout_input = prep_inputs(rollout_input[:, 1:, :], outputs[:, -1, :].unsqueeze(1), throttle[:, i, :].unsqueeze(1))
+    else:
+        inputs, targets, set_num = data_loader.get_batch()
+        # print(inputs.shape)
+        outputs, out_cn, out_hn = model(inputs, hn.detach(), cn.detach(), prob=args.prob_layer)
+        loss = loss_fn(outputs, targets.detach())
+        
     if mode == 'train':
         optimizer.zero_grad()
-        # print(inputs.shape)
-    outputs, out_cn, out_hn = model(inputs, hn.detach(), cn.detach(), prob=args.prob_layer)
-    loss = loss_fn(outputs, targets.detach())
-    if mode == 'train':
         loss.backward()
         optimizer.step()
     loss_batch = loss.item()

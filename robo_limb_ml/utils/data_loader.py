@@ -99,10 +99,12 @@ class DataLoader():
         output_data = data[self.output_features]
         input_data = input_data.values
         output_data = output_data.values
-        num_sequences = input_data.shape[0] - self.seq_len
+        num_sequences = input_data.shape[0] - self.seq_len - self.pred_len
         self.input_data = np.array([input_data[i:i+self.seq_len] for i in range(num_sequences)])
-        output_data = output_data[self.seq_len-1:]
+        output_data = output_data[self.seq_len:]
+        throttle_data = input_data[self.seq_len:, -2:]
         self.output_data = np.array([output_data[i:i+self.pred_len] for i in range(num_sequences)])
+        self.throttle_data = np.array([throttle_data[i:i+self.pred_len] for i in range(num_sequences)])
         self.n_batches = self.input_data.shape[0] // self.batch_size
 
     def get_batch(self):
@@ -120,6 +122,15 @@ class DataLoader():
         self.current_batch += 1
         return data, labels, set_num
     
+    def get_batch_rollout(self):
+        data = torch.tensor(self.input_data[self.current_batch*self.batch_size:(self.current_batch+1)*self.batch_size]).to(device=self.device).float()
+        labels = torch.tensor(self.output_data[self.current_batch*self.batch_size:(self.current_batch+1)*self.batch_size]).to(device=self.device).float()
+        throttle = torch.tensor(self.throttle_data[self.current_batch*self.batch_size:(self.current_batch+1)*self.batch_size]).to(device=self.device).float()
+        set_num = self.data['set_num'].values[self.current_batch*self.batch_size]
+        # print(self.input_data.shape, self.output_data.shape)
+        self.current_batch += 1
+        return data, labels, throttle, set_num
+        
     def get_n_batches(self):
         return self.n_batches
  
