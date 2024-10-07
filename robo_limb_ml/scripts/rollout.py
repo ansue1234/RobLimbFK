@@ -27,7 +27,7 @@ for file in tqdm(files):
     # skip RNN and MLP
     if 'rnn' in file_lower or 'mlp' in file_lower:
         continue
-    if 'blue_no_cool_down_25k' not in file_lower:
+    if 'layer_norm' not in file_lower:
         continue
     # if 'new' not in file_lower or 'time' not in file_lower:
     #     continue
@@ -47,7 +47,7 @@ for file in tqdm(files):
     #     test_data_path = '../ml_data/purple_test_data.csv'
     # if 'cool' in file_lower or 'new' in file_lower:
     #     test_data_path = '../ml_data/purple_no_cool_down_test_data.csv'
-    test_data_path = '../ml_data/blue_no_cool_down_test_data.csv'
+    test_data_path = '../ml_data/purple_no_cool_down_test_data.csv'
     print(test_data_path)
     filename = '../model_weights/new_weights/' + file
     print('File', file)
