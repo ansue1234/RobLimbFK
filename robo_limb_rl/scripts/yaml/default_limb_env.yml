@@ -1,6 +1,6 @@
 model_path: '../../robo_limb_ml/model_weights/new_weights/SEQ2SEQ_b512_e400_s-1_len100_no_cool_down_new_no_time_1724791809'
 model_type: 'SEQ2SEQ'
-viz_type: 'scatter'
+viz_type: 'line'
 input_dim: 6
 output_dim: 4
 hidden_dim: 512

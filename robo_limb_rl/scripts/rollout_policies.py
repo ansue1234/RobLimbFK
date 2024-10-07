@@ -10,7 +10,7 @@ from tqdm import tqdm
 from sac_cont_action import Actor, make_env
 
 def load_env(seed):
-    env = gym.make('LimbEnv-v0', config_path='./yaml/default_limb_env.yml', render_mode='None', seed=seed)
+    env = gym.make('LimbEnv-v0', config_path='./yaml/default_limb_env.yml', render_mode='human', seed=seed)
     return env
     
 # Only Safe Env for now, Nominal policy is a random policy, supports only MLP for now
@@ -27,17 +27,17 @@ if __name__ == '__main__':
     # Load Policy
     envs = gym.vector.SyncVectorEnv([lambda: load_env(seed)])
     actor = Actor(envs).to(device)
-    actor_params, _, _ = torch.load('../policies/LimbEnv-v0__sac_250000__1__1728049762/sac_250000.cleanrl_model', map_location=device, weights_only=True)
+    actor_params, _, _ = torch.load('../policies/LimbEnv-v0__sac_1M_new__1__1728083577/sac_1M_new.cleanrl_model', map_location=device, weights_only=True)
     actor.load_state_dict(actor_params)
     actor.eval()
 
     # Rollout
-    x = 40*np.sin(np.linspace(0, 2*np.pi, 100))
-    y = 40*np.cos(np.linspace(0, 2*np.pi, 100))
+    x = 40*np.sin(np.linspace(0, 2*np.pi, 360))
+    y = 40*np.cos(np.linspace(0, 2*np.pi, 360))
     path_to_track = np.vstack((x, y)).T
     
     obs, _ = env.reset()
-    # env.set_goal(path_to_track[0])
+    env.set_goal(path_to_track[0])
     i = 0
     while i < len(path_to_track):
         obs = torch.tensor(obs).to(torch.float32).to(device).unsqueeze(0)
@@ -46,13 +46,13 @@ if __name__ == '__main__':
         # print("Observation: ", obs)
         # print("Goal: ", path_to_track[i])
         # if done:
-        obs, _ = env.reset()
-        print(env.goal)
+        # obs, _ = env.reset()
+        # print(env.goal)
             # env.set_goal(path_to_track[i])
-        if np.linalg.norm(obs[:2] - path_to_track[i]) < 4:
+        if np.linalg.norm(obs[:2] - path_to_track[i]) < 3:
             i += 1
             print(f"Reached point {i}")
-            # env.set_goal(path_to_track[i])
-        elif done:
-            obs, _ = env.reset()
-            # env.set_goal(path_to_track[i])
+            env.set_goal(path_to_track[i])
+        # elif done:
+        #     obs, _ = env.reset()
+        #     env.set_goal(path_to_track[i])
