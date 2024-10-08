@@ -12,7 +12,7 @@ from robo_limb_ml.utils.utils import rollout, viz_graph
 from tqdm import tqdm
 
 input_size = 6
-hidden_size = 512
+hidden_size = 1024
 num_layers = 3
 batch_size = 512
 output_size = 4
@@ -27,7 +27,7 @@ for file in tqdm(files):
     # skip RNN and MLP
     if 'rnn' in file_lower or 'mlp' in file_lower:
         continue
-    if 'new' not in file_lower or 'time' not in file_lower:
+    if 'grad_clip_larger' not in file_lower:
         continue
     # if 'vel' not in file_lower and 'no_time' not in file_lower:
     #     continue
@@ -45,6 +45,7 @@ for file in tqdm(files):
         test_data_path = '../ml_data/purple_test_data.csv'
     if 'cool' in file_lower or 'new' in file_lower:
         test_data_path = '../ml_data/purple_no_cool_down_test_data.csv'
+    test_data_path = '../ml_data/purple_no_cool_down_test_data.csv'
     print(test_data_path)
     filename = '../model_weights/new_weights/' + file
     print('File', file)

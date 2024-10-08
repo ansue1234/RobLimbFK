@@ -1,18 +1,42 @@
 
-python train_LSTM.py --epochs 2 \
-                     --batch_size 10 \
-                     --num_samples 25001 \
-                     --exp_name test_rollout\
+python train_LSTM.py --epochs 400 \
+                     --batch_size 512 \
+                     --exp_name rollout_grad_clip_larger\
                      --train_data_path ../ml_data/purple_no_cool_down_train_data.csv \
                      --test_data_path ../ml_data/purple_no_cool_down_test_data.csv \
                      --seq_len 50 \
-                     --predict_len 40 \
+                     --predict_len 20 \
+                     --hidden_size 1024 \
                      --vel true \
                      --no_time true \
                      --seed 1 \
+                     --tag rollout
 
+python train_LSTM.py --epochs 400 \
+                     --batch_size 512 \
+                     --exp_name rollout_grad_clip_orig\
+                     --train_data_path ../ml_data/purple_no_cool_down_train_data.csv \
+                     --test_data_path ../ml_data/purple_no_cool_down_test_data.csv \
+                     --seq_len 50 \
+                     --predict_len 25 \
+                     --vel true \
+                     --no_time true \
+                     --seed 1 \
+                     --tag rollout
 
-
+# python train_LSTM.py --epochs 400 \
+#                      --batch_size 512 \
+#                      --exp_name rollout_grad_clip_5_layers\
+#                      --train_data_path ../ml_data/purple_no_cool_down_train_data.csv \
+#                      --test_data_path ../ml_data/purple_no_cool_down_test_data.csv \
+#                      --seq_len 50 \
+#                      --predict_len 10 \
+#                      --hidden_size 1024 \
+#                      --num_layer 5 \
+#                      --vel true \
+#                      --no_time true \
+#                      --seed 1 \
+#                      --tag rollout
 
 # python train.py --epochs 200 \
 #                 --batch_size 2048 \

@@ -31,45 +31,34 @@ args = parser.parse_args()
 
 def prep_inputs(prev_inputs, outputs, throttles):
     next_step = torch.cat((outputs, throttles), dim=2)
-    inputs = torch.cat((prev_inputs[:, 1:, :], next_step), dim=1)
+    inputs = torch.cat((prev_inputs, next_step), dim=1)
     return inputs
 
 
 def get_loss(data_loader, model, hn, cn, prev_setnum, loss_fn, optimizer, mode="train", state='stateful', rollout=True):
     if rollout:
         inputs, targets, throttle, set_num = data_loader.get_batch_rollout()
-        # outputs, out_cn, out_hn = model(inputs, hn.detach(), cn.detach(), prob=args.prob_layer)
-        # loss = loss_fn(outputs, targets[:, 0, :].unsqueeze(1).detach())
-        # rollout_input = prep_inputs(inputs[:, 1:, :], outputs, throttle[:, 0, :].unsqueeze(1))
-        out_hn, out_cn = hn.detach(), cn.detach()
-        pred_outputs = torch.zeros_like(targets).to(device)
-        pred_step = torch.zeros_like(inputs[:, 0, :]).to(device)
-        rollout_input = inputs
-        loss = None
-        for i in range(0, targets.shape[1] - 1):
-            outputs, out_cn, out_hn = model(rollout_input.detach(), out_hn, out_cn, prob=args.prob_layer)
-            pred_outputs[:, i, :] = outputs[:, -1, :].clone()
-            # print(pred_outputs.shape)
-            # print(targets[:, :i, :].shape)
-            if loss:
-                loss += loss_fn(pred_outputs[:, :i + 1, :].clone(), targets[:, :i + 1, :].detach())
-            else:
-                loss = loss_fn(pred_outputs[:, :i + 1, :].clone(), targets[:, :i + 1, :].detach())
-            pred_step[:, :-2] = pred_outputs[:, i, :].clone() + inputs[:, i, :-2]
-            pred_step[:,  -2:] = throttle[:, i, :]
-            rollout_input[:, :-1, :] = rollout_input[:, 1:, :]
-            rollout_input[:, -1:, :] = pred_step.unsqueeze(1)
+        outputs, out_cn, out_hn = model(inputs, hn.detach(), cn.detach(), prob=args.prob_layer)
+        loss = loss_fn(outputs, targets[:, 0, :].unsqueeze(1).detach())
+        rollout_input = prep_inputs(inputs[:, 1:, :], outputs, throttle[:, 0, :].unsqueeze(1))
+        pred_outputs = outputs
+        for i in range(2, targets.shape[1]):
+            outputs, out_cn, out_hn = model(rollout_input, out_hn, out_cn, prob=args.prob_layer)
+            pred_outputs = torch.cat((pred_outputs, outputs), dim=1)
+            loss += loss_fn(pred_outputs, targets[:, :i, :].detach())
+            rollout_input = prep_inputs(rollout_input[:, 1:, :], outputs[:, -1, :].unsqueeze(1), throttle[:, i, :].unsqueeze(1))
     else:
         inputs, targets, set_num = data_loader.get_batch()
-        # print(inputs.shape)
         outputs, out_cn, out_hn = model(inputs, hn.detach(), cn.detach(), prob=args.prob_layer)
-        loss = loss_fn(outputs, targets.detach())
+        loss = loss_fn(outputs, targets[:, :1, :].detach())
         
     if mode == 'train':
         optimizer.zero_grad()
         loss.backward()
+        torch.nn.utils.clip_grad_value_(model.parameters(), clip_value=1)
         optimizer.step()
     loss_batch = loss.item()
+    # print(set_num)
     if set_num != prev_setnum or state != 'stateful':
         cn = torch.zeros(num_layers, args.batch_size, hidden_size).to(device)
         hn = torch.zeros(num_layers, args.batch_size, hidden_size).to(device)
@@ -123,7 +112,13 @@ if __name__ == "__main__":
     if not args.vel:
         input_features.remove('vel_x')
         input_features.remove('vel_y')
-        
+    input_features = [
+                    'theta_x',
+                    'theta_y',
+                    'vel_x',
+                    'vel_y',
+                    'X_throttle',
+                    'Y_throttle'] 
     train_data_loader = DataLoader(file_path=args.train_data_path,
                                    batch_size=args.batch_size,
                                    device=device,
@@ -177,7 +172,10 @@ if __name__ == "__main__":
         cn = torch.zeros(num_layers, args.batch_size, hidden_size).to(device)
         hn = torch.zeros(num_layers, args.batch_size, hidden_size).to(device)
         for batch in range(train_data_loader.n_batches):
-            hn, cn, loss, set_num = get_loss(train_data_loader, model, hn, cn, set_num, loss_fn, optimizer, mode="train", state=args.state)
+            if batch % 5 == 0:
+                hn, cn, loss, set_num = get_loss(train_data_loader, model, hn, cn, set_num, loss_fn, optimizer, mode="train", state=args.state)
+            else:
+                hn, cn, loss, set_num = get_loss(train_data_loader, model, hn, cn, set_num, loss_fn, optimizer, mode="train", state=args.state, rollout=False)
             loss_epoch += loss
             # print(f'Epoch: {epoch}, Batch: {batch}, Loss: {loss.item()}')
             # wandb.log({"loss": loss.item()})

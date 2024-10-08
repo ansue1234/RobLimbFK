@@ -123,6 +123,8 @@ class DataLoader():
         return data, labels, set_num
     
     def get_batch_rollout(self):
+        if self.current_batch == self.n_batches:
+            self.current_batch = 0
         data = torch.tensor(self.input_data[self.current_batch*self.batch_size:(self.current_batch+1)*self.batch_size]).to(device=self.device).float()
         labels = torch.tensor(self.output_data[self.current_batch*self.batch_size:(self.current_batch+1)*self.batch_size]).to(device=self.device).float()
         throttle = torch.tensor(self.throttle_data[self.current_batch*self.batch_size:(self.current_batch+1)*self.batch_size]).to(device=self.device).float()
