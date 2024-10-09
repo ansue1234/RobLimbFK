@@ -69,8 +69,7 @@ class PolicyRunner(Node):
         self.policy_path = self.get_parameter('policy_path').get_parameter_value().string_value
         self.results_path = self.get_parameter('results_path').get_parameter_value().string_value
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.threshold = self.get_parameter('threshold').get_parameter_value().integer_value
-        self.model = QNet_MLP(input_dim=4, output_dim=4, reward_type='reg').to(self.device)
+        self.model = Actor().to(self.device)
         self.model.load_state_dict(torch.load(self.policy_path, map_location=self.device, weights_only=True))
         self.model.eval()
         
