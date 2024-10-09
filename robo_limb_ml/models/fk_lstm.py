@@ -22,12 +22,8 @@ class FK_LSTM(nn.LSTM):
         self.h0 = torch.zeros(self.num_layers, batch_size, self.hidden_size).to(self.device)
         self.c0 = torch.zeros(self.num_layers, batch_size, self.hidden_size).to(self.device)
         self.logstd = nn.Parameter(torch.tensor(np.ones(output_size)*0.1).to(self.device)).to(self.device)
-        self.dense_net = nn.Sequential(
-            nn.Linear(hidden_size, hidden_size),
-            nn.ReLU(),
-            nn.Linear(hidden_size, output_size)
-        ).to(self.device)
-        # self.dense_net = nn.Linear(hidden_size, output_size).to(self.device)
+        self.activation = nn.Tanh()
+        self.dense_net = nn.Linear(hidden_size, output_size).to(self.device)
         self.boundary = domain_boundary
     
     # Allows for stateful or stateless LTSM
