@@ -152,6 +152,8 @@ if __name__ == "__main__":
                     device=device,
                     batch_first=True).to(device=device)
     model.load_state_dict(torch.load(args.model_path, map_location=device))
+    model.h0 = torch.zeros(num_layers, 1, hidden_size).to(device=device)
+    model.c0 = torch.zeros(num_layers, 1, hidden_size).to(device=device)
     optimizer = optim.Adam(model.parameters())
     loss_fn = nn.MSELoss()
     # batch_size = args.batch_size

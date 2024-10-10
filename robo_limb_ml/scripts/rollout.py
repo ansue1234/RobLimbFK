@@ -27,7 +27,7 @@ for file in tqdm(files):
     # skip RNN and MLP
     if 'rnn' in file_lower or 'mlp' in file_lower:
         continue
-    if 'grad_clip_larger' not in file_lower:
+    if 'cascade' not in file_lower:
         continue
     # if 'vel' not in file_lower and 'no_time' not in file_lower:
     #     continue

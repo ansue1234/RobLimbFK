@@ -41,15 +41,34 @@ def prep_hidden(hidden, arch_type='LSTM'):
     return hidden_states
 
 def get_loss(data_loader, model, hidden, prev_setnum, loss_fn, optimizer, mode="train", state='stateful', underlying_model='LSTM'):
-    inputs, targets, set_num = data_loader.get_batch()
+    inputs, targets, throttle, set_num = data_loader.get_batch_rollout()
     if mode == 'train':
         optimizer.zero_grad()
         # print(inputs.shape)
     hidden = prep_hidden(hidden, underlying_model)
-    outputs, out_hidden = model(inputs, targets, hidden, prob=args.prob_layer, mode=mode)
-    loss = loss_fn(outputs, targets.detach())
+    outputs, out_hidden = model(inputs, targets, hidden, throttle, prob=args.prob_layer, mode=mode)
+    targets = targets.detach()
+    # # Compute the squared differences
+    # squared_diffs = (outputs - targets) ** 2  # Shape: (batch_size, seq_len, feature_size)
+
+    # # Compute the cumulative sum of squared differences over the sequence length
+    # cumulative_squared_diffs = torch.cumsum(squared_diffs, dim=1)  # Shape: (batch_size, seq_len, feature_size)
+
+    # # Sum over the batch and feature dimensions to get total squared error for each prefix length
+    # total_squared_errors = cumulative_squared_diffs.sum(dim=0).sum(dim=1)  # Shape: (seq_len,)
+
+    # # Compute the number of elements for each prefix length
+    # total_elements = targets.shape[0] * targets.shape[2] * (torch.arange(targets.shape[1], device=device) + 1)  # Shape: (seq_len,)
+
+    # # Compute the mean squared error for each prefix length
+    # mean_squared_errors = total_squared_errors / total_elements  # Shape: (seq_len,)
+
+    # # Sum the mean squared errors up to predict_len
+    # loss = mean_squared_errors.sum()
+    loss = loss_fn(outputs, targets)
     if mode == 'train':
         loss.backward()
+        torch.nn.utils.clip_grad_value_(model.parameters(), clip_value=1)
         optimizer.step()
     loss_batch = loss.item()
     if set_num != prev_setnum or state != 'stateful':
@@ -99,20 +118,12 @@ if __name__ == "__main__":
     print(args.prob_layer)
     print("underlying model", args.underlying_model)
     print("attn", args.attention)
-    input_features = ['time_begin',
-                      'time_begin_traj',
-                      'theta_x',
+    input_features = ['theta_x',
                       'theta_y',
                       'vel_x',
                       'vel_y',
                       'X_throttle',
                       'Y_throttle'] 
-    if args.no_time:
-        input_features.remove('time_begin')
-        input_features.remove('time_begin_traj')
-    if not args.vel:
-        input_features.remove('vel_x')
-        input_features.remove('vel_y')
     
     train_data_loader = DataLoader(file_path=args.train_data_path,
                                    batch_size=args.batch_size,
@@ -150,7 +161,7 @@ if __name__ == "__main__":
                        attention=args.attention,
                        pred_len=args.predict_len,
                        teacher_forcing_ratio=args.teacher_forcing_ratio).to(device=device)
-    optimizer = optim.Adam(model.parameters())
+    optimizer = optim.Adam(model.parameters(), lr=1e-4)
     loss_fn = nn.MSELoss()
     
     for epoch in tqdm(range(args.epochs)):

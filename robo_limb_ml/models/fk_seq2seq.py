@@ -3,6 +3,7 @@ import torch.nn as nn
 import numpy as np
 import torch
 
+torch.autograd.set_detect_anomaly(True)
 
 class SEQ2SEQ_Encoder(nn.Module):
     def __init__(self,
@@ -55,7 +56,9 @@ class SEQ2SEQ_Decoder(nn.Module):
                                                                                     num_layers,
                                                                                     batch_first=batch_first,
                                                                                     device=device)
-        self.fc = nn.Linear(embedding_size, output_size).to(device)
+        self.fc = nn.Sequential(
+            nn.ReLU(),
+            nn.Linear(embedding_size, output_size)).to(device)
         self.attention = attention
         self.causal = causal
         if attention:
@@ -114,17 +117,20 @@ class FK_SEQ2SEQ(nn.Module):
         self.device = device
         print("device of SEQ2SEQ", self.device)
         self.logstd = nn.Parameter(torch.tensor(np.ones(output_size)*0.1).to(self.device)).to(self.device)
-        self.activation = nn.Tanh()
         self.pred_len = pred_len
         self.boundary = domain_boundary
         self.force_ratio = teacher_forcing_ratio
     
     # Allows for stateful or stateless LTSM
-    def forward(self, x, gnd_truth, hidden, prob=False, mode='train'):
+    def forward(self, x, gnd_truth, hidden, throttle=None, prob=False, mode='train'):
         # print("main forward", x.shape)
         encoder_out, encoder_hidden = self.encoder(x, hidden)
         decoder_input = x[:, -1:, :]
         outputs = [None for _ in range(self.pred_len)]
+        if throttle is not None:
+            throttle = throttle.detach()
+            gnd_truth = gnd_truth.detach()
+        decoder_input = decoder_input.clone().detach()
         decoder_hidden = encoder_hidden
         for i in range(self.pred_len):
             decoder_out, decoder_hidden = self.decoder(decoder_input, decoder_hidden, encoder_out)
@@ -134,11 +140,16 @@ class FK_SEQ2SEQ(nn.Module):
                 decoder_out = distribution.rsample().float()
             decoder_out = torch.tanh(decoder_out) * self.boundary
             outputs[i] = decoder_out
-            if np.random.random() < self.force_ratio and mode == 'train':
-                decoder_input = gnd_truth[:, i:i+1, :]
-            else:
-                # add velocities
-                decoder_input = decoder_out 
-            # print("decoder input shape", decoder_input.shape, i)
+            decoder_output = decoder_out.clone().detach()
+            decoder_input = decoder_input.clone().detach()
+            if throttle is not None:
+                if np.random.random() < self.force_ratio and mode == 'train':
+                    decoder_input[:, -1:, :-2] = decoder_input[:, -1:, :-2] + gnd_truth[:, i:i+1, :]
+                    decoder_input[:, :, -2:] = throttle[:, i:i+1, :]
+                else:
+                    # print(decoder_input.shape, decoder_out.shape)
+                    decoder_input[:, -1:, :-2] = decoder_input[:, -1:, :-2] + decoder_output
+                    decoder_input[:, :, -2:] = throttle[:, i:i+1, :]
+                    # print("decoder input shape", decoder_input.shape, i)
         out = torch.cat(outputs, dim=1)
         return out, encoder_hidden
