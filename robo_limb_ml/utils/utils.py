@@ -66,7 +66,8 @@ def rollout(model_path,
             num_layers,
             batch_size,
             output_size,
-            device):
+            device,
+            ema=None):
     model_path_lower = model_path.lower()
     model_type = 'SEQ2SEQ' if 'seq2' in model_path_lower else 'LSTM'
     attention = True if 'attention' in model_path_lower else False
@@ -120,6 +121,11 @@ def rollout(model_path,
         test_df.insert(7, col_2.name, col_2)
     else:
         test_df = pd.read_csv(test_data_path).dropna()
+    if ema:
+        test_df['theta_x'] = test_df['theta_x'].ewm(alpha=ema, adjust=False).mean()
+        test_df['theta_y'] = test_df['theta_y'].ewm(alpha=ema, adjust=False).mean()
+        test_df['vel_x'] = test_df['vel_x'].ewm(alpha=ema, adjust=False).mean()
+        test_df['vel_y'] = test_df['vel_y'].ewm(alpha=ema, adjust=False).mean()
     test_tensor = torch.tensor(test_df.values.copy(), dtype=torch.float32).to(device=device)
     # obs_tensor = torch.tensor(test_df.drop(columns=["vel_x", "vel_y"]).values, dtype=torch.float32).to(device=device)
     outputs = torch.zeros(test_df.shape).to(device=device)
@@ -157,7 +163,10 @@ def rollout(model_path,
                     delta_states, _ = model(data.unsqueeze(0), None, hidden, mode='test')
             delta_states = delta_states.squeeze()
             
-            pred_theta_x, pred_theta_y, pred_vel_x, pred_vel_y = delta_states[0] + theta_x, delta_states[1] + theta_y, delta_states[2] + vel_x, delta_states[3] + vel_y
+            # pred_theta_x, pred_theta_y, pred_vel_x, pred_vel_y = delta_states[0] + theta_x, delta_states[1] + theta_y, delta_states[2] + vel_x, delta_states[3] + vel_y
+            dt = outputs[i][0] - outputs[i - 1][0]
+            pred_theta_x, pred_theta_y, pred_vel_x, pred_vel_y = delta_states[0] + theta_x, delta_states[1] + theta_y, test_tensor[i][-3], test_tensor[i][-4]
+
             if not vel:
                 time_begin_1, time_begin_traj_1, _, _, X_throttle_1, Y_throttle_1, _, _ = test_tensor[i]
                 outputs[i] = torch.tensor([time_begin_1, time_begin_traj_1, pred_theta_x, pred_theta_y, X_throttle_1, Y_throttle_1, pred_vel_x, pred_vel_y]).to(device=device)

@@ -28,12 +28,9 @@ class SEQ2SEQ_Encoder(nn.Module):
         self.encoder.h0 = torch.zeros(num_layers, batch_size, embedding_size).to(self.device)
         if encoder_type == "LSTM":
             self.encoder.c0 = torch.zeros(num_layers, batch_size, embedding_size).to(self.device)
-        self.layer_norm = nn.LayerNorm(embedding_size).to(device)
         
     def forward(self, x, hidden):
         out, hidden = self.encoder(x, hidden)
-        out = self.layer_norm(out)
-        hidden = (self.layer_norm(hidden[0]), self.layer_norm(hidden[1]))
         return out, hidden
 
 class SEQ2SEQ_Decoder(nn.Module):
@@ -70,7 +67,6 @@ class SEQ2SEQ_Decoder(nn.Module):
             self.decoder.c0 = torch.zeros(num_layers, batch_size, embedding_size).to(self.device)
         self.fc1 = nn.Linear(input_size, embedding_size)
         self.fc2 = nn.Linear(embedding_size, input_size)
-        self.layer_norm = nn.LayerNorm(embedding_size).to(device)
         
     def forward(self, x, hidden, encoder_out):
         if self.attention:
@@ -79,8 +75,6 @@ class SEQ2SEQ_Decoder(nn.Module):
             x = self.fc2(x)
         # print("decoder forward 1", x.shape)
         out, hidden = self.decoder(x, hidden)
-        out = self.layer_norm(out)
-        hidden = (self.layer_norm(hidden[0]), self.layer_norm(hidden[1]))
         out = self.fc(out)
         return out, hidden
         

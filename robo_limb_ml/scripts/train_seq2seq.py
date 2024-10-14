@@ -30,6 +30,7 @@ parser.add_argument('--state', type=str, default='stateful')
 parser.add_argument('--tag', type=str, default='debugging')
 parser.add_argument('--vel', type=bool, default=False)
 parser.add_argument('--no_time', type=bool, default=False)
+parser.add_argument('--ema', type=float, default=-1.0)
 args = parser.parse_args()
 
 
@@ -50,6 +51,7 @@ def get_loss(data_loader, model, hidden, prev_setnum, loss_fn, optimizer, mode="
     loss = loss_fn(outputs, targets.detach())
     if mode == 'train':
         loss.backward()
+        torch.nn.utils.clip_grad_value_(model.parameters(), clip_value=1)
         optimizer.step()
     loss_batch = loss.item()
     if set_num != prev_setnum or state != 'stateful':
@@ -107,12 +109,19 @@ if __name__ == "__main__":
                       'vel_y',
                       'X_throttle',
                       'Y_throttle'] 
+    output_features=['delta_theta_x',
+                     'delta_theta_y']
     if args.no_time:
         input_features.remove('time_begin')
         input_features.remove('time_begin_traj')
     if not args.vel:
         input_features.remove('vel_x')
         input_features.remove('vel_y')
+    
+    if args.ema > 0:
+        ema=args.ema
+    else:
+        ema=None
     
     train_data_loader = DataLoader(file_path=args.train_data_path,
                                    batch_size=args.batch_size,
@@ -121,15 +130,19 @@ if __name__ == "__main__":
                                    seq_len=args.seq_len,
                                    num_samples=args.num_samples,
                                    input_features=input_features,
-                                   pad=True)
+                                   output_features=output_features,
+                                   pad=True,
+                                   ema=ema)
     test_data_loader = DataLoader(file_path=args.test_data_path,
                                   batch_size=args.batch_size,
                                   device=device,
                                   predict_len=args.predict_len,
                                   num_samples=-1,
                                   input_features=input_features,
+                                  output_features=output_features,
                                   seq_len=args.seq_len,
-                                  pad=True)
+                                  pad=True,
+                                  ema=ema)
     input_size = train_data_loader.input_dim
     hidden_size = args.hidden_size
     output_size = train_data_loader.output_dim

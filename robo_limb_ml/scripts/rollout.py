@@ -12,10 +12,10 @@ from robo_limb_ml.utils.utils import rollout, viz_graph
 from tqdm import tqdm
 
 input_size = 6
-hidden_size = 512
-num_layers = 3
+hidden_size = 128
+num_layers = 1
 batch_size = 512
-output_size = 4
+output_size = 2
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -27,8 +27,14 @@ for file in tqdm(files):
     # skip RNN and MLP
     if 'rnn' in file_lower or 'mlp' in file_lower:
         continue
-    if 'layer_norm' not in file_lower:
+    if 'small_ema' not in file_lower:
         continue
+    if 'ema_0.2' in file_lower:
+        ema = 0.2
+    elif 'ema_0.5' in file_lower:
+        ema = 0.5
+    else: 
+        ema = 0.8
     # if 'new' not in file_lower or 'time' not in file_lower:
     #     continue
     # if 'vel' not in file_lower and 'no_time' not in file_lower:
@@ -58,14 +64,15 @@ for file in tqdm(files):
                                                   num_layers,
                                                   batch_size,
                                                   output_size,
-                                                  device)
+                                                  device,
+                                                  ema=ema)
     fig = viz_graph(outputs_df, test_df, file, show_end=True)
     
-    with open("../results/oct_4/"+file+".txt", 'w') as f:
+    with open("../results/oct_14/"+file+".txt", 'w') as f:
         f.write("RMSE: " + str(rmse.item()) + '\n')
         f.write("R^2: " + str(r2_score.item()))
-    outputs_df.to_csv("../results/oct_4/outputs/outputs_"+file+".csv")
-    test_df.to_csv("../results/oct_4/test/test_"+file+".csv")
+    outputs_df.to_csv("../results/oct_14/outputs/outputs_"+file+".csv")
+    test_df.to_csv("../results/oct_14/test/test_"+file+".csv")
     
-    fig.savefig("../results/oct_4/"+file+".jpg")
+    fig.savefig("../results/oct_14/"+file+".jpg")
     fig.show()

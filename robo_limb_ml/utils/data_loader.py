@@ -24,7 +24,8 @@ class DataLoader():
                                   'delta_theta_y',
                                   'delta_vel_x',
                                   'delta_vel_y'],
-                 pad=False):
+                 pad=False,
+                 ema=None):
         """seq_len must be greater than or equal to predict_len"""
         assert seq_len >= predict_len
         self.data = pd.read_csv(file_path).iloc[:num_samples]
@@ -40,6 +41,7 @@ class DataLoader():
         self.pad = pad
         self.input_dim = len(input_features)
         self.output_dim = len(output_features)
+        self.ema = ema
 
         self._calc_label()
         self._format_data()
@@ -61,6 +63,11 @@ class DataLoader():
         data['set_num'] = data['new_set'].cumsum().ffill().astype(int)
         dfs = []
         for _, group in data.groupby('traj_num'):
+            if self.ema:
+                group['theta_x'] = group['theta_x'].ewm(alpha=self.ema, adjust=False).mean()
+                group['theta_y'] = group['theta_y'].ewm(alpha=self.ema, adjust=False).mean()
+                group['vel_x'] = group['vel_x'].ewm(alpha=self.ema, adjust=False).mean()
+                group['vel_y'] = group['vel_y'].ewm(alpha=self.ema, adjust=False).mean()
             group['delta_theta_x'] = group['theta_x'].diff().shift(-1)
             group['delta_theta_y'] = group['theta_y'].diff().shift(-1)
             group['delta_vel_x'] = group['vel_x'].diff().shift(-1)

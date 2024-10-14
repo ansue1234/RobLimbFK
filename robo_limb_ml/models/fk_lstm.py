@@ -24,7 +24,6 @@ class FK_LSTM(nn.LSTM):
         self.logstd = nn.Parameter(torch.tensor(np.ones(output_size)*0.1).to(self.device)).to(self.device)
         self.activation = nn.Tanh()
         self.dense_net = nn.Linear(hidden_size, output_size).to(self.device)
-        self.layer_norm = nn.LayerNorm(hidden_size).to(self.device)
         self.boundary = domain_boundary
     
     # Allows for stateful or stateless LTSM
@@ -32,9 +31,6 @@ class FK_LSTM(nn.LSTM):
         # out, _ = super(FK_LSTM, self).forward(x, (self.h0, self.c0))
         # print(x.shape)
         out, (out_hn, out_cn) = super(FK_LSTM, self).forward(x, (hn, cn))
-        out = self.layer_norm(out)
-        out_cn = self.layer_norm(out_cn)
-        out_hn = self.layer_norm(out_hn)
         out = self.dense_net(out)
         if prob:
             distribution = torch.distributions.Normal(loc=out,
