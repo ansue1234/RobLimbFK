@@ -5,9 +5,9 @@
 
 ADS myFlexSensor;
 //PWM of X,Y,-X,-Y
-const int PWMPX = 12;
-const int PWMNX = 10;
-const int PWMPY = 13;
+const int PWMPX = 5;
+const int PWMNX = 3;
+const int PWMPY = 2;
 const int PWMNY = 4;
 
 int PWMPX_Sig_learned = 0;
@@ -21,14 +21,22 @@ int SampleRate = 50;
 int max_state = 100; //Boundary of state space
 
 //Set Min and Max based on velocities of limb
-float PWMMaxPX = 30.00;
-float PWMMinPX = 20.00;
-float PWMMaxNX = 35.00;
-float PWMMinNX = 20.00;
-float PWMMaxPY = 34.00;
-float PWMMinPY = 21.00;
-float PWMMaxNY = 30.00;
-float PWMMinNY = 19.00;
+//float PWMMaxPX = 30.00;
+//float PWMMinPX = 20.00;
+//float PWMMaxNX = 35.00;
+//float PWMMinNX = 20.00;
+//float PWMMaxPY = 34.00;
+//float PWMMinPY = 21.00;
+//float PWMMaxNY = 30.00;
+//float PWMMinNY = 19.00;
+float PWMMaxPX = 25.00;
+float PWMMinPX = 15.00;
+float PWMMaxNX = 25.00;
+float PWMMinNX = 15.00;
+float PWMMaxPY = 25.00;
+float PWMMinPY = 15.00;
+float PWMMaxNY = 25.00;
+float PWMMinNY = 15.00;
 
 float PWMPX_Sig = 0;
 float PWMNX_Sig = 0;
@@ -38,7 +46,7 @@ float PWMNY_Sig = 0;
 float BX;
 float BY;
 
-int Cool_Time = 20000;
+int Cool_Time = 50;
 
 int for_loop_refresh = 100;
 

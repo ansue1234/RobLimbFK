@@ -281,7 +281,7 @@ void setup()
   pinMode(PWMNX,OUTPUT);
   pinMode(PWMPY,OUTPUT);
   pinMode(PWMNY,OUTPUT);
-  randomSeed(55);
+  randomSeed(77);
 
 
   Wire.begin();
@@ -312,7 +312,7 @@ void setup()
   }
   Serial.println("Refresh Complete");
   get_sampled_cell(sampled_cell, sampled_coord);
-  randomSeed(analogRead(0));
+//  randomSeed(analogRead(0));
   PWMRange(PWM_x_signals, PWMMaxPX, PWMMinPX, PWMMaxNX, PWMMinNX);
   PWMRange(PWM_y_signals, PWMMaxPY, PWMMinPY, PWMMaxNY, PWMMinNY);
   for (int i=0; i<num_PWM_signals; i++) {

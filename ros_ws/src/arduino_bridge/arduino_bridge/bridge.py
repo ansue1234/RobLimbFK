@@ -42,7 +42,7 @@ class Bridger(Node):
                 msg = Angles()
                 msg.theta_x = float(parsed_data[1])
                 msg.theta_y = float(parsed_data[2])
-                msg.time = int(parsed_data[3])
+                msg.time = float(parsed_data[3])
                 self.publisher_.publish(msg)
             else:
                 self.get_logger().info("Read Sensor failed!!!!")
