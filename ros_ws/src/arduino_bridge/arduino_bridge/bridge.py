@@ -23,7 +23,7 @@ class Bridger(Node):
         self.freq = self.get_parameter('frequency').get_parameter_value().integer_value 
         self.baudrate = self.get_parameter('baudrate').get_parameter_value().integer_value
         self.publisher_ = self.create_publisher(Angles, 'limb_angles', 1)
-        self.subscriber_ = self.create_subscription(Throttle, 'throttle', self.listener_callback, 2)
+        self.subscriber_ = self.create_subscription(Throttle, 'throttle', self.listener_callback, 10)
         
         timer_period = 1/self.freq # seconds
         self.timer = self.create_timer(timer_period, self.timer_callback)
@@ -42,6 +42,7 @@ class Bridger(Node):
                 msg = Angles()
                 msg.theta_x = float(parsed_data[1])
                 msg.theta_y = float(parsed_data[2])
+                msg.time = int(parsed_data[3])
                 self.publisher_.publish(msg)
             else:
                 self.get_logger().info("Read Sensor failed!!!!")
@@ -68,7 +69,7 @@ class Bridger(Node):
     def listener_callback(self, msg):
         thr_x = msg.throttle_x
         thr_y = msg.throttle_y
-        if len(self.throttle_queue) != 0:
+        if len(self.throttle_queue) >= 10:
             self.throttle_queue.pop(0)
         self.throttle_queue.append((thr_x, thr_y))
 
