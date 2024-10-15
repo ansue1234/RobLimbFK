@@ -78,6 +78,7 @@ def rollout(model_path,
         seq_len = 100
     else:
         seq_len = 50
+    seq_len = 50
     # seq_len = 10 if 'len10' in model_path_lower else 50
     vel = True if 'vel' in model_path_lower or 'no_time' in model_path_lower else False
     no_time = True if 'no_time' in model_path_lower else False
@@ -113,20 +114,22 @@ def rollout(model_path,
                    teacher_forcing_ratio=0.0).to(device=device)
         model.load_state_dict(torch.load(model_path, map_location=device))
         model.eval()
-    if not vel:
-        test_df = pd.read_csv(test_data_path).dropna()
-        col_1 = test_df.pop('vel_x')
-        test_df.insert(7, col_1.name, col_1)
-        col_2 = test_df.pop('vel_y')
-        test_df.insert(7, col_2.name, col_2)
-    else:
-        test_df = pd.read_csv(test_data_path).dropna()
+    # if not vel:
+    #     test_df = pd.read_csv(test_data_path).dropna()
+    #     col_1 = test_df.pop('vel_x')
+    #     test_df.insert(7, col_1.name, col_1)
+    #     col_2 = test_df.pop('vel_y')
+    #     test_df.insert(7, col_2.name, col_2)
+    # else:
+    test_df = pd.read_csv(test_data_path).dropna()
+    print("ema:", ema)
     if ema:
         test_df['theta_x'] = test_df['theta_x'].ewm(alpha=ema, adjust=False).mean()
         test_df['theta_y'] = test_df['theta_y'].ewm(alpha=ema, adjust=False).mean()
         test_df['vel_x'] = test_df['vel_x'].ewm(alpha=ema, adjust=False).mean()
         test_df['vel_y'] = test_df['vel_y'].ewm(alpha=ema, adjust=False).mean()
     test_tensor = torch.tensor(test_df.values.copy(), dtype=torch.float32).to(device=device)
+    print("test df cols:", test_df.columns)
     # obs_tensor = torch.tensor(test_df.drop(columns=["vel_x", "vel_y"]).values, dtype=torch.float32).to(device=device)
     outputs = torch.zeros(test_df.shape).to(device=device)
     outputs[:seq_len] = test_tensor[:seq_len].clone()
@@ -146,10 +149,10 @@ def rollout(model_path,
             elif vel and no_time:
                 data = outputs[i - seq_len:i, 2:]
             # print("data shape", data.shape)
-            if not vel:    
-                time_begin, time_begin_traj, theta_x, theta_y, X_throttle, Y_throttle, vel_x, vel_y  = outputs[i - 1]
-            else:
-                time_begin, time_begin_traj, theta_x, theta_y, vel_x, vel_y, X_throttle, Y_throttle  = outputs[i - 1]
+            # if not vel:    
+            #     time_begin, time_begin_traj, theta_x, theta_y, X_throttle, Y_throttle, vel_x, vel_y  = outputs[i - 1]
+            # else:
+            time_begin, time_begin_traj, theta_x, theta_y, vel_x, vel_y, X_throttle, Y_throttle  = outputs[i - 1]
                 
             if stateful:
                 if model_type == 'LSTM':
@@ -165,14 +168,15 @@ def rollout(model_path,
             
             # pred_theta_x, pred_theta_y, pred_vel_x, pred_vel_y = delta_states[0] + theta_x, delta_states[1] + theta_y, delta_states[2] + vel_x, delta_states[3] + vel_y
             dt = outputs[i][0] - outputs[i - 1][0]
-            pred_theta_x, pred_theta_y, pred_vel_x, pred_vel_y = delta_states[0] + theta_x, delta_states[1] + theta_y, test_tensor[i][-3], test_tensor[i][-4]
+            # print("delta_states:", delta_states)
+            pred_theta_x, pred_theta_y, pred_vel_x, pred_vel_y = delta_states[0] + theta_x, delta_states[1] + theta_y, test_tensor[i][-4], test_tensor[i][-3]
 
-            if not vel:
-                time_begin_1, time_begin_traj_1, _, _, X_throttle_1, Y_throttle_1, _, _ = test_tensor[i]
-                outputs[i] = torch.tensor([time_begin_1, time_begin_traj_1, pred_theta_x, pred_theta_y, X_throttle_1, Y_throttle_1, pred_vel_x, pred_vel_y]).to(device=device)
-            else:
-                time_begin_1, time_begin_traj_1, _, _, _, _, X_throttle_1, Y_throttle_1 = test_tensor[i]
-                outputs[i] = torch.tensor([time_begin_1, time_begin_traj_1, pred_theta_x, pred_theta_y, pred_vel_x, pred_vel_y, X_throttle_1, Y_throttle_1]).to(device=device)
+            # if not vel:
+            #     time_begin_1, time_begin_traj_1, _, _, X_throttle_1, Y_throttle_1, _, _ = test_tensor[i]
+            #     outputs[i] = torch.tensor([time_begin_1, time_begin_traj_1, pred_theta_x, pred_theta_y, X_throttle_1, Y_throttle_1, pred_vel_x, pred_vel_y]).to(device=device)
+            # else:
+            time_begin_1, time_begin_traj_1, _, _, _, _, X_throttle_1, Y_throttle_1 = test_tensor[i]
+            outputs[i] = torch.tensor([time_begin_1, time_begin_traj_1, pred_theta_x, pred_theta_y, pred_vel_x, pred_vel_y, X_throttle_1, Y_throttle_1]).to(device=device)
             
     outputs_df = pd.DataFrame(outputs.cpu().detach().numpy(), columns=test_df.columns)
     output_states = torch.tensor(outputs_df[['theta_x', 'theta_y', 'vel_x', 'vel_y']].values, dtype=torch.float32).to(device=device)

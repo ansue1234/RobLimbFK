@@ -11,8 +11,20 @@ from robo_limb_ml.models.fk_seq2seq import FK_SEQ2SEQ
 from robo_limb_ml.utils.utils import rollout, viz_graph
 from tqdm import tqdm
 
+# input_size = 6
+# hidden_size = 512
+# num_layers = 3
+# batch_size = 512
+# output_size = 2
+
+# input_size = 6
+# hidden_size = 128
+# num_layers = 1
+# batch_size = 512
+# output_size = 2
+
 input_size = 6
-hidden_size = 128
+hidden_size = 1024
 num_layers = 1
 batch_size = 512
 output_size = 2
@@ -27,14 +39,16 @@ for file in tqdm(files):
     # skip RNN and MLP
     if 'rnn' in file_lower or 'mlp' in file_lower:
         continue
-    if 'small_ema' not in file_lower:
+    if 'ultra_wide' not in file_lower:
         continue
-    if 'ema_0.2' in file_lower:
+    if 'ema0.2' in file_lower:
         ema = 0.2
-    elif 'ema_0.5' in file_lower:
+    elif 'ema0.5' in file_lower:
         ema = 0.5
-    else: 
+    elif 'ema0.8' in file_lower: 
         ema = 0.8
+    else:
+        ema = 1
     # if 'new' not in file_lower or 'time' not in file_lower:
     #     continue
     # if 'vel' not in file_lower and 'no_time' not in file_lower:
@@ -66,7 +80,7 @@ for file in tqdm(files):
                                                   output_size,
                                                   device,
                                                   ema=ema)
-    fig = viz_graph(outputs_df, test_df, file, show_end=True)
+    fig = viz_graph(outputs_df, test_df, file, show_end=False)
     
     with open("../results/oct_14/"+file+".txt", 'w') as f:
         f.write("RMSE: " + str(rmse.item()) + '\n')
