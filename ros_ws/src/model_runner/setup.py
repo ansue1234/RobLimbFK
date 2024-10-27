@@ -26,6 +26,7 @@ setup(
             'looper=model_runner.open_loop_input_traj:main',
             'filter=model_runner.filter:main',
             'visualizer=model_runner.visualizer:main',
+            'plotter=model_runner.cvs_plotter:main',
         ],
     },
 )
