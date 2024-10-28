@@ -24,10 +24,10 @@ from tqdm import tqdm
 # output_size = 2
 
 input_size = 6
-hidden_size = 1024
-num_layers = 1
+hidden_size = 512
+num_layers = 3
 batch_size = 512
-output_size = 2
+output_size = 4
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -37,18 +37,21 @@ for file in tqdm(files):
     file_lower = file.lower()
     print(file_lower)
     # skip RNN and MLP
-    if 'rnn' in file_lower or 'mlp' in file_lower:
+    # if 'mlp' in file_lower:
+    #     continue
+    if not (('b1024_e400_s25000_finetune_final_1730122927' in file_lower) or ('b1024_e400_s25000_len100_25000_blue_1730124674' in file_lower) or ('b1024_e400_s-1_len100_ema_0.8_1728875793' in file_lower)):
         continue
-    if 'ultra_wide' not in file_lower:
-        continue
-    if 'ema0.2' in file_lower:
-        ema = 0.2
-    elif 'ema0.5' in file_lower:
-        ema = 0.5
-    elif 'ema0.8' in file_lower: 
-        ema = 0.8
-    else:
-        ema = 1
+    # if 'rnn' not in file_lower:
+    #     continue
+    # if 'ema0.2' in file_lower:
+    #     ema = 0.2
+    # elif 'ema0.5' in file_lower:
+    #     ema = 0.5
+    # elif 'ema0.8' in file_lower: 
+    #     ema = 0.8
+    # else:
+    #     ema = 1
+    ema = 0.8
     # if 'new' not in file_lower or 'time' not in file_lower:
     #     continue
     # if 'vel' not in file_lower and 'no_time' not in file_lower:
@@ -67,7 +70,7 @@ for file in tqdm(files):
     #     test_data_path = '../ml_data/purple_test_data.csv'
     # if 'cool' in file_lower or 'new' in file_lower:
     #     test_data_path = '../ml_data/purple_no_cool_down_test_data.csv'
-    test_data_path = '../ml_data/purple_no_cool_down_test_data.csv'
+    test_data_path = '../ml_data/blue_no_cool_down_test_data.csv'
     print(test_data_path)
     filename = '../model_weights/new_weights/' + file
     print('File', file)
@@ -79,14 +82,15 @@ for file in tqdm(files):
                                                   batch_size,
                                                   output_size,
                                                   device,
-                                                  ema=ema)
+                                                  ema=ema,
+                                                  seq_len=100)
     fig = viz_graph(outputs_df, test_df, file, show_end=False)
     
-    with open("../results/oct_14/"+file+".txt", 'w') as f:
+    with open("../results/oct_27/"+file+"_no_fine_tune_single.txt", 'w') as f:
         f.write("RMSE: " + str(rmse.item()) + '\n')
         f.write("R^2: " + str(r2_score.item()))
-    outputs_df.to_csv("../results/oct_14/outputs/outputs_"+file+".csv")
-    test_df.to_csv("../results/oct_14/test/test_"+file+".csv")
+    outputs_df.to_csv("../results/oct_27/outputs/outputs_"+file+"_no_fine_tune_single.csv")
+    test_df.to_csv("../results/oct_27/test/test_"+file+"_no_fine_tune_single.csv")
     
-    fig.savefig("../results/oct_14/"+file+".jpg")
+    fig.savefig("../results/oct_27/"+file+"_no_fine_tune_single.jpg")
     fig.show()

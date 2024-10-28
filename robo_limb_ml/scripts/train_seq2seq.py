@@ -110,7 +110,9 @@ if __name__ == "__main__":
                       'X_throttle',
                       'Y_throttle'] 
     output_features=['delta_theta_x',
-                     'delta_theta_y']
+                     'delta_theta_y',
+                     'delta_vel_x',
+                     'delta_vel_y']
     if args.no_time:
         input_features.remove('time_begin')
         input_features.remove('time_begin_traj')

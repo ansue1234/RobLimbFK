@@ -110,6 +110,7 @@ if __name__ == "__main__":
                                    predict_len=args.predict_len,
                                    seq_len=args.seq_len,
                                    num_samples=args.num_samples,
+                                   ema=0.8,
                                    input_features=input_features,
                                    pad=True)
     test_data_loader = DataLoader(file_path=args.test_data_path,
@@ -119,6 +120,7 @@ if __name__ == "__main__":
                                   num_samples=-1,
                                   seq_len=args.seq_len,
                                   input_features=input_features,
+                                  ema=0.8,
                                   pad=True)
     input_size = train_data_loader.input_dim
     hidden_size = args.hidden_size

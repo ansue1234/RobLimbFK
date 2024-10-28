@@ -67,9 +67,16 @@ def rollout(model_path,
             batch_size,
             output_size,
             device,
-            ema=None):
+            ema=None,
+            seq_len=None):
     model_path_lower = model_path.lower()
-    model_type = 'SEQ2SEQ' if 'seq2' in model_path_lower else 'LSTM'
+    if 'seq2' in model_path_lower:
+        model_type = 'SEQ2SEQ' 
+    if 'lstm' in model_path_lower:
+        model_type = 'LSTM'
+    if 'rnn' in model_path_lower:
+        model_type = 'RNN'
+    
     attention = True if 'attention' in model_path_lower else False
     stateful = False if 'stateless' in model_path_lower else False
     if 'len10' in model_path_lower:
@@ -78,7 +85,7 @@ def rollout(model_path,
         seq_len = 100
     else:
         seq_len = 50
-    seq_len = 50
+    seq_len = 100
     # seq_len = 10 if 'len10' in model_path_lower else 50
     vel = True if 'vel' in model_path_lower or 'no_time' in model_path_lower else False
     no_time = True if 'no_time' in model_path_lower else False
@@ -114,6 +121,16 @@ def rollout(model_path,
                    teacher_forcing_ratio=0.0).to(device=device)
         model.load_state_dict(torch.load(model_path, map_location=device))
         model.eval()
+    elif model_type == 'RNN':
+        model = FK_RNN(input_size=input_size,
+                    hidden_size=hidden_size,
+                    num_layers=num_layers,
+                    batch_size=batch_size,
+                    output_size=output_size,
+                    device=device,
+                    batch_first=True).to(device=device)
+        model.load_state_dict(torch.load(model_path, map_location=device))
+        model.eval()
     # if not vel:
     #     test_df = pd.read_csv(test_data_path).dropna()
     #     col_1 = test_df.pop('vel_x')
@@ -124,6 +141,7 @@ def rollout(model_path,
     test_df = pd.read_csv(test_data_path).dropna()
     print("ema:", ema)
     if ema:
+        print("ema true")
         test_df['theta_x'] = test_df['theta_x'].ewm(alpha=ema, adjust=False).mean()
         test_df['theta_y'] = test_df['theta_y'].ewm(alpha=ema, adjust=False).mean()
         test_df['vel_x'] = test_df['vel_x'].ewm(alpha=ema, adjust=False).mean()
@@ -148,6 +166,7 @@ def rollout(model_path,
                 data = outputs[i - seq_len:i, :-2]
             elif vel and no_time:
                 data = outputs[i - seq_len:i, 2:]
+            stateful=True
             # print("data shape", data.shape)
             # if not vel:    
             #     time_begin, time_begin_traj, theta_x, theta_y, X_throttle, Y_throttle, vel_x, vel_y  = outputs[i - 1]
@@ -159,6 +178,8 @@ def rollout(model_path,
                     delta_states, hn, cn = model(data.unsqueeze(0), hn, cn)
                 elif model_type == 'SEQ2SEQ':
                     delta_states, hidden = model(data.unsqueeze(0), None, hidden, mode='test')
+                elif model_type == 'RNN':
+                    delta_states, hn = model(data.unsqueeze(0), hn)
             else:
                 if model_type == 'LSTM':
                     delta_states, _, _ = model(data.unsqueeze(0), hn, cn)
@@ -166,10 +187,11 @@ def rollout(model_path,
                     delta_states, _ = model(data.unsqueeze(0), None, hidden, mode='test')
             delta_states = delta_states.squeeze()
             
-            # pred_theta_x, pred_theta_y, pred_vel_x, pred_vel_y = delta_states[0] + theta_x, delta_states[1] + theta_y, delta_states[2] + vel_x, delta_states[3] + vel_y
-            dt = outputs[i][0] - outputs[i - 1][0]
+            pred_theta_x, pred_theta_y, pred_vel_x, pred_vel_y = delta_states[0] + theta_x, delta_states[1] + theta_y, delta_states[2] + vel_x, delta_states[3] + vel_y
+            # dt = test_tensor[i][0] - test_tensor[i - 1][0]
+            # print(outputs[i][0], outputs[i-1][0])
             # print("delta_states:", delta_states)
-            pred_theta_x, pred_theta_y, pred_vel_x, pred_vel_y = delta_states[0] + theta_x, delta_states[1] + theta_y, test_tensor[i][-4], test_tensor[i][-3]
+            # pred_theta_x, pred_theta_y, pred_vel_x, pred_vel_y = delta_states[0] + theta_x, delta_states[1] + theta_y, delta_states[0]/dt, delta_states[1]/dt
 
             # if not vel:
             #     time_begin_1, time_begin_traj_1, _, _, X_throttle_1, Y_throttle_1, _, _ = test_tensor[i]
@@ -183,10 +205,10 @@ def rollout(model_path,
     test_states = torch.tensor(test_df[['theta_x', 'theta_y', 'vel_x', 'vel_y']].values, dtype=torch.float32).to(device=device)
     
     metric = R2Score()
-    metric.update(test_states, output_states)
+    metric.update(test_states[seq_len:], output_states[seq_len:])
     r2_score = metric.compute()
     print("R^2", r2_score.item())
-    rmse = torch.sqrt(nn.MSELoss()(test_states, output_states))
+    rmse = torch.sqrt(nn.MSELoss()(test_states[seq_len:], output_states[seq_len:]))
     print("RMSE", rmse.item())
     
     return outputs_df, test_df, r2_score, rmse

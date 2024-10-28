@@ -77,20 +77,18 @@ if __name__ == "__main__":
     print(device)
     print(args.prob_layer)
     print(args.state)
-    input_features = ['time_begin',
-                      'time_begin_traj',
-                      'theta_x',
+    input_features = ['theta_x',
                       'theta_y',
                       'vel_x',
                       'vel_y',
                       'X_throttle',
                       'Y_throttle'] 
-    if args.no_time:
-        input_features.remove('time_begin')
-        input_features.remove('time_begin_traj')
-    if not args.vel:
-        input_features.remove('vel_x')
-        input_features.remove('vel_y')
+    # if args.no_time:
+    #     input_features.remove('time_begin')
+    #     input_features.remove('time_begin_traj')
+    # if not args.vel:
+    #     input_features.remove('vel_x')
+    #     input_features.remove('vel_y')
         
     train_data_loader = DataLoader(file_path=args.train_data_path,
                                    batch_size=args.batch_size,
@@ -99,6 +97,7 @@ if __name__ == "__main__":
                                    seq_len=args.seq_len,
                                    num_samples=args.num_samples,
                                    input_features=input_features,
+                                   ema=0.8,
                                    pad=True)
     test_data_loader = DataLoader(file_path=args.test_data_path,
                                   batch_size=args.batch_size,
@@ -107,6 +106,7 @@ if __name__ == "__main__":
                                   num_samples=-1,
                                   input_features=input_features,
                                   seq_len=args.seq_len,
+                                  ema=0.8,
                                   pad=True)
     input_size = train_data_loader.input_dim
     hidden_size = args.hidden_size

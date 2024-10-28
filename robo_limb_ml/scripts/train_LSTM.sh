@@ -1,9 +1,22 @@
 
-python train_RNN.py --epochs 10 \
-                     --batch_size 512 \
-                     --exp_name testing_RNN \
-                     --seq_len 5 \
-                     --state stateless
+
+python train_LSTM.py --epochs 400 \
+                     --batch_size 1024 \
+                     --exp_name ema_0.8\
+                     --train_data_path ../ml_data/purple_no_cool_down_train_data.csv \
+                     --test_data_path ../ml_data/purple_no_cool_down_test_data.csv \
+                     --seq_len 100 \
+                     --seed 1 \
+                     --tag ema_0.8
+
+python train_RNN.py --epochs 400 \
+                    --batch_size 1024 \
+                    --exp_name ema_0.8 \
+                    --train_data_path ../ml_data/purple_no_cool_down_train_data.csv \
+                    --test_data_path ../ml_data/purple_no_cool_down_test_data.csv \
+                    --seed 1 \
+                    --seq_len 100 \
+                    --tag ema_0.8
 
 
 # python train.py --epochs 200 \
