@@ -39,7 +39,15 @@ for file in tqdm(files):
     # skip RNN and MLP
     # if 'mlp' in file_lower:
     #     continue
-    if not (('b1024_e400_s25000_finetune_final_1730122927' in file_lower) or ('b1024_e400_s25000_len100_25000_blue_1730124674' in file_lower) or ('b1024_e400_s-1_len100_ema_0.8_1728875793' in file_lower)):
+    # fine_tuning
+    # if not (('b1024_e400_s25000_finetune_final_1730122927' in file_lower) or ('b1024_e400_s25000_len100_25000_blue_1730124674' in file_lower) or ('b1024_e400_s-1_len100_ema_0.8_1728875793' in file_lower)):
+    #     continue
+    # Purp 
+    if (not (('LSTM_b1024_e400_s-1_len100_ema_0.8_1730123022' in file) 
+             or ('RNN_b1024_e400_s-1_len100_ema_0.8_1730126891' in file) 
+             or ('SEQ2SEQ_ATTENTION_b1024_e400_s-1_len100_ema_0.8_1728875793' in file)
+             or ('SEQ2SEQ_b1024_e400_s-1_len100_ema_0.8_1728882683' in file))
+        ):
         continue
     # if 'rnn' not in file_lower:
     #     continue
@@ -70,7 +78,8 @@ for file in tqdm(files):
     #     test_data_path = '../ml_data/purple_test_data.csv'
     # if 'cool' in file_lower or 'new' in file_lower:
     #     test_data_path = '../ml_data/purple_no_cool_down_test_data.csv'
-    test_data_path = '../ml_data/blue_no_cool_down_test_data.csv'
+    appendix = "saw_tooth_purp_vid"
+    test_data_path = '../ml_data/'+ appendix + '.csv'
     print(test_data_path)
     filename = '../model_weights/new_weights/' + file
     print('File', file)
@@ -85,12 +94,11 @@ for file in tqdm(files):
                                                   ema=ema,
                                                   seq_len=100)
     fig = viz_graph(outputs_df, test_df, file, show_end=False)
-    
-    with open("../results/oct_27/"+file+"_no_fine_tune_single.txt", 'w') as f:
+    with open("../results/oct_31/"+file+"_"+appendix+".txt", 'w') as f:
         f.write("RMSE: " + str(rmse.item()) + '\n')
         f.write("R^2: " + str(r2_score.item()))
-    outputs_df.to_csv("../results/oct_27/outputs/outputs_"+file+"_no_fine_tune_single.csv")
-    test_df.to_csv("../results/oct_27/test/test_"+file+"_no_fine_tune_single.csv")
+    outputs_df.to_csv("../results/oct_31/outputs/outputs_"+file+"_"+appendix+".csv")
+    test_df.to_csv("../results/oct_31/test/test_"+file+"_"+appendix+".csv")
     
-    fig.savefig("../results/oct_27/"+file+"_no_fine_tune_single.jpg")
+    fig.savefig("../results/oct_31/"+file+"_"+appendix+".jpg")
     fig.show()
