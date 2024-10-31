@@ -3,7 +3,7 @@
 <launch>
   <node pkg="model_runner" exec="looper" name="open_loop">
     <!-- <remap from="/throttle" to="/raw_throttle"/> -->
-    <param name="traj_path" value="/home/ansue1234/Research/SML/RobLimbFK/ros_ws/src/traj/trajectories_sin.csv"/>
+    <param name="traj_path" value="/home/ansue1234/Research/SML/RobLimbFK/ros_ws/src/traj/trajectories_saw_tooth.csv"/>
   </node>
   <!-- perform remap so both turtles listen to the same command topic -->
 </launch>

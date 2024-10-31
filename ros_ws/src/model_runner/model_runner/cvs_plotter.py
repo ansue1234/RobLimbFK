@@ -18,9 +18,9 @@ class Plotter(Node):
         # Retrieve the parameters
         self.angle_subscriber_ = self.create_subscription(Angles, 'limb_angles', self.angle_listener_callback, 1)
         self.throttle_subscriber_ = self.create_subscription(Throttle, 'sent_throttle', self.throttle_listener_callback, 1)
-        self.file = open(os.path.join(os.getcwd(), 'data.txt'), 'a')
+        self.file = open(os.path.join(os.getcwd(), 'sin_blue_vid_data.txt'), 'a')
         self.file.write('time,theta_x,theta_y\n')
-        self.file_throttle = open(os.path.join(os.getcwd(), 'throttle.txt'), 'a')
+        self.file_throttle = open(os.path.join(os.getcwd(), 'sin_blue_vid_throttle.txt'), 'a')
         self.file_throttle.write('throttle_x,throttle_y\n')
         # self.ax.set_xlabel('X Bending Angle ($\theta_x$ degrees)', fontsize=28)
         # self.ax.set_ylabel('Y Bending Angle ($\theta_y$ degrees)', fontsize=28)
@@ -54,6 +54,7 @@ def main(args=None):
     # (optional - otherwise it will be done automatically
     # when the garbage collector destroys the node object)
     viz.file.close()
+    viz.file_throttle.close()
     viz.destroy_node()
     rclpy.shutdown()
 
