@@ -5,3 +5,4 @@ ros_ws/src/model_runner/models/** filter=lfs diff=lfs merge=lfs -text
 ros_ws/src/model_runner/policies/** filter=lfs diff=lfs merge=lfs -text
 robo_limb_rl/policies/** filter=lfs diff=lfs merge=lfs -text
 robo_limb_rl/policies/**/* filter=lfs diff=lfs merge=lfs -text
+robo_limb_ml/results/** filter=lfs diff=lfs merge=lfs -text

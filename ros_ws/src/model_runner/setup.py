@@ -27,6 +27,7 @@ setup(
             'filter=model_runner.filter:main',
             'visualizer=model_runner.visualizer:main',
             'plotter=model_runner.cvs_plotter:main',
+            'broadcaster=model_runner.broadcaster:main',
         ],
     },
 )
