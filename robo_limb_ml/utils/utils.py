@@ -146,7 +146,10 @@ def rollout(model_path,
         test_df['theta_y'] = test_df['theta_y'].ewm(alpha=ema, adjust=False).mean()
         test_df['vel_x'] = test_df['vel_x'].ewm(alpha=ema, adjust=False).mean()
         test_df['vel_y'] = test_df['vel_y'].ewm(alpha=ema, adjust=False).mean()
+    # test_df['X_throttle'] *= 0.1
+    # test_df['Y_throttle'] *= 0.1
     test_tensor = torch.tensor(test_df.values.copy(), dtype=torch.float32).to(device=device)
+    
     print("test df cols:", test_df.columns)
     # obs_tensor = torch.tensor(test_df.drop(columns=["vel_x", "vel_y"]).values, dtype=torch.float32).to(device=device)
     outputs = torch.zeros(test_df.shape).to(device=device)
