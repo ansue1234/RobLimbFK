@@ -1,11 +1,13 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import numpy as np
 import rclpy
 import datetime
 from rclpy.node import Node
 
 from interfaces.msg import Angles, Throttle, State
+from std_msgs.msg import Bool
 
 LOG_STD_MAX = 2
 LOG_STD_MIN = -5
@@ -67,18 +69,12 @@ class PolicyRunner(Node):
 
         # Retrieve the parameters
         self.policy_path = self.get_parameter('policy_path').get_parameter_value().string_value
-        self.results_path = self.get_parameter('results_path').get_parameter_value().string_value
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model = Actor().to(self.device)
         self.model.load_state_dict(torch.load(self.policy_path, map_location=self.device, weights_only=True))
         self.model.eval()
-        
-        date = datetime.datetime.now().strftime(r"%Y_%m_%d_%H_%M_%S")
-        result_file = self.results_path + date + 'R'+str(self.threshold) + 'limb_9.txt'
-        self.result_file = open(result_file, 'w')
 
         self.throttle_publisher_ = self.create_publisher(Throttle, 'throttle', 1)
-        self.throttle_subscriber_ = self.create_subscription(Throttle, 'raw_throttle', self.throttle_listener_callback, 1)
         self.angle_subscriber_ = self.create_subscription(Angles, 'limb_angles', self.angle_listener_callback, 1)
 
         self.curr_ang = None
@@ -88,6 +84,8 @@ class PolicyRunner(Node):
         self.curr_state = None
 
         self.current_action = None
+        
+        self.start = False
         
     # stores the newest received angles
     def angle_listener_callback(self, msg):
@@ -120,21 +118,37 @@ class PolicyRunner(Node):
             
         self.curr_ang = curr_angle
         self.curr_time = curr_time
+        # Running policy to get throttle
+        if self.start:
+            self.run_policy(self.curr_state, self.goal)
+    
+    def run_policy(self, state, goal):
+        # state = torch.tensor([state.theta_x, state.theta_y, state.vel_x, state.vel_y], dtype=torch.float32).unsqueeze(0).to(self.device)
+        state = torch.tensor([state.theta_x, state.theta_y, state.vel_x, state.vel_y, goal.theta_x, goal.theta_y], dtype=torch.float32).unsqueeze(0).to(self.device)
+        action, _, _ = self.model.get_action(state)
+        throttle = Throttle()
+        thr = action.detach().cpu().numpy()
+        throttle.throttle_x = np.clip(thr[0], -10, 10)
+        throttle.throttle_y = np.clip(thr[1], -10, 10)
+        self.throttle_publisher_.publish(throttle)
     
     def goal_callback(self, msg):
         self.goal = msg
+    
+    def controller_state_callback(self, msg):
+        self.start = msg.data
 
 def main(args=None):
     rclpy.init(args=args)
 
-    filter = PolicyRunner()
+    runner = PolicyRunner()
 
-    rclpy.spin(filter)
+    rclpy.spin(runner)
 
     # Destroy the node explicitly
     # (optional - otherwise it will be done automatically
     # when the garbage collector destroys the node object)
-    filter.destroy_node()
+    runner.destroy_node()
     rclpy.shutdown()
 
 
