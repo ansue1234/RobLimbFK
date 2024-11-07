@@ -51,6 +51,7 @@ class Feeder(Node):
             msg.theta_x = goal_x
             msg.theta_y = goal_y
             self.goal_publisher_.publish(msg)
+            self.controller_publisher_.publish(self.start)
             self.current_goal = np.array([goal_x, goal_y])
         else:
             # stop if trajectory is finished

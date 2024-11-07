@@ -1,0 +1,14 @@
+<!-- example.launch.xml -->
+
+<launch>
+  <!-- <node pkg="arduino_bridge" exec="teleop" name="tele">
+    <remap from="/throttle" to="/raw_throttle"/>
+  </node> -->
+  <!-- perform remap so both turtles listen to the same command topic -->
+  <node pkg="model_runner" exec="policy" name="policy">
+    <param name="policy_path" value="/home/ansue1234/Research/SML/RobLimbFK/ros_ws/src/model_runner/policies/sac_1M_new.cleanrl_model"/>
+  </node>
+  <node pkg="model_runner" exec="visualizer" name="viz">
+    <param name="traj_path" value="/home/ansue1234/Research/SML/RobLimbFK/ros_ws/src/traj/way_points_sin.csv"/>
+  </node>
+</launch>

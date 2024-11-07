@@ -22,10 +22,10 @@ class Actor(nn.Module):
         self.fc_logstd = nn.Linear(256, 2)
         # action rescaling
         self.register_buffer(
-            "action_scale", torch.tensor([10, 10], dtype=torch.float32)
+            "action_scale", torch.tensor([[10, 10]], dtype=torch.float32)
         )
         self.register_buffer(
-            "action_bias", torch.tensor([0, 0], dtype=torch.float32)
+            "action_bias", torch.tensor([[0, 0]], dtype=torch.float32)
         )
 
     def forward(self, x):
@@ -62,8 +62,6 @@ class PolicyRunner(Node):
             namespace='',
             parameters=[
                 ('policy_path', ''),
-                ('freq', 20),
-                ('results_path', ''),
             ]
         )
 
@@ -71,12 +69,16 @@ class PolicyRunner(Node):
         self.policy_path = self.get_parameter('policy_path').get_parameter_value().string_value
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model = Actor().to(self.device)
-        self.model.load_state_dict(torch.load(self.policy_path, map_location=self.device, weights_only=True))
+        print("Hi------------------")
+        # print(torch.load(self.policy_path, map_location=self.device, weights_only=True))
+        self.model.load_state_dict(torch.load(self.policy_path, map_location=self.device, weights_only=True)[0])
         self.model.eval()
 
         self.throttle_publisher_ = self.create_publisher(Throttle, 'throttle', 1)
         self.angle_subscriber_ = self.create_subscription(Angles, 'limb_angles', self.angle_listener_callback, 1)
-
+        self.goal_subscriber_ = self.create_subscription(Angles, 'goal', self.goal_callback, 1)
+        self.control_subscriber_ = self.create_subscription(Bool, 'controller', self.controller_state_callback, 1)
+        
         self.curr_ang = None
         self.past_ang = None
         self.curr_time = None
@@ -125,11 +127,12 @@ class PolicyRunner(Node):
     def run_policy(self, state, goal):
         # state = torch.tensor([state.theta_x, state.theta_y, state.vel_x, state.vel_y], dtype=torch.float32).unsqueeze(0).to(self.device)
         state = torch.tensor([state.theta_x, state.theta_y, state.vel_x, state.vel_y, goal.theta_x, goal.theta_y], dtype=torch.float32).unsqueeze(0).to(self.device)
-        action, _, _ = self.model.get_action(state)
+        action, _, _ = self.model.get_action(state.unsqueeze(0))
         throttle = Throttle()
-        thr = action.detach().cpu().numpy()
-        throttle.throttle_x = np.clip(thr[0], -10, 10)
-        throttle.throttle_y = np.clip(thr[1], -10, 10)
+        thr = action.detach().cpu().numpy().squeeze()
+        # self.get_logger().info(f"thr: {thr}")
+        throttle.throttle_x = float(np.clip(thr[0]/10, -1, 1))
+        throttle.throttle_y = float(np.clip(thr[1]/10, -1, 1))
         self.throttle_publisher_.publish(throttle)
     
     def goal_callback(self, msg):
@@ -137,6 +140,7 @@ class PolicyRunner(Node):
     
     def controller_state_callback(self, msg):
         self.start = msg.data
+        
 
 def main(args=None):
     rclpy.init(args=args)

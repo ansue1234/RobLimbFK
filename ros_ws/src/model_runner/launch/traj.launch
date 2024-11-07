@@ -1,9 +1,12 @@
 <!-- example.launch.xml -->
 
 <launch>
-  <node pkg="model_runner" exec="looper" name="open_loop">
+  <!-- <node pkg="model_runner" exec="looper" name="open_loop"> -->
     <!-- <remap from="/throttle" to="/raw_throttle"/> -->
-    <param name="traj_path" value="/home/ansue1234/Research/SML/RobLimbFK/ros_ws/src/traj/trajectories_saw_tooth.csv"/>
+    <!-- <param name="traj_path" value="/home/ansue1234/Research/SML/RobLimbFK/ros_ws/src/traj/trajectories_saw_tooth.csv"/>
+  </node> -->
+  <node pkg="model_runner" exec="feeder" name="way_point_feeder">
+    <param name="traj_path" value="/home/ansue1234/Research/SML/RobLimbFK/ros_ws/src/traj/way_points_sin.csv"/>
   </node>
   <!-- perform remap so both turtles listen to the same command topic -->
 </launch>

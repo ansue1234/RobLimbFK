@@ -1,6 +1,7 @@
 import torch
 import rclpy
 import datetime
+import pandas as pd
 from rclpy.node import Node
 
 from interfaces.msg import Angles
@@ -16,14 +17,21 @@ class Visualizer(Node):
     def __init__(self):
         super().__init__('visualizer')
         # Declare parameters using declare_parameters
-
+        self.declare_parameters(
+            namespace='',
+            parameters=[
+                ('traj_path', ''),
+            ]
+        )
         # Retrieve the parameters
-        self.angle_subscriber_ = self.create_subscription(Angles, 'ground_truth', self.angle_listener_callback, 1)
+        self.traj_path = self.get_parameter('traj_path').get_parameter_value().string_value
+        self.angle_subscriber_ = self.create_subscription(Angles, 'limb_angles', self.angle_listener_callback, 1)
         self.prediction_subscriber_ = self.create_subscription(Angles, 'prediction', self.prediction_listener_callback, 1)
         self.timer = self.create_timer(0.05, self.timer_callback)
         self.fig, self.ax = plt.subplots(figsize=(5, 5))
         self.ax.set_xlim(-100, 100)
         self.ax.set_ylim(-100, 100)
+        self.traj_pts = pd.read_csv(self.traj_path)
         # self.ax.set_xlabel('X Bending Angle ($\theta_x$ degrees)', fontsize=28)
         # self.ax.set_ylabel('Y Bending Angle ($\theta_y$ degrees)', fontsize=28)
         # self.ax.set_title('Live State Visualization', fontsize=34)
@@ -31,6 +39,7 @@ class Visualizer(Node):
         self.predicted_x, self.predicted_y = [], []
         self.line_gnd_truth, = self.ax.plot(self.current_x, self.current_y, 'r-', markersize=10, linewidth=4, label='Gnd. Truth')
         self.line_pred, = self.ax.plot(self.predicted_x, self.predicted_y, color='blue', linestyle='dotted', markersize=10, linewidth=4, label='Pred. (Fine-tuned)')
+        self.ax.plot(self.traj_pts['goal_x'], self.traj_pts['goal_y'], 'g', label='Waypoints', linewidth=3)
         # self.scatter = self.ax.scatter([], [], c='purple', s=100, label='Limb Pos.')
         # self.ax.plot(30*np.cos(np.linspace(0, 2*np.pi, 100)), 30*np.sin(np.linspace(0, 2*np.pi, 100)), 'g', label='Safe Bound.', linewidth=3)
         plt.draw()
