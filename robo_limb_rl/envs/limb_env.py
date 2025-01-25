@@ -33,6 +33,11 @@ class LimbEnv(gym.Env):
         self.theta_limit = config.get('theta_limit', 100)
         self.goal_tolerance = config.get('goal_tolerance', 1)
         self.int_actions = config.get('int_actions', False)
+        self.full_reset_prob = config.get('full_reset_prob', 0.3)
+        self.domain_randomization = config.get('domain_randomization', False)
+        self.reach_pen_weight = config.get('reach_pen_weight', 1)
+        self.vel_pen_weight = config.get('vel_pen_weight', 1)
+        self.path_pen_weight = config.get('path_pen_weight', 1)
         self.render_mode = render_mode
         self.seed = seed
         # Setting up model
@@ -48,6 +53,13 @@ class LimbEnv(gym.Env):
         
         self.load_model(self.model_path)
         self.model.eval()
+        
+        # Setting up config for domain randomization
+        self.amp_scalar_low = 0.5
+        self.amp_scalar_high = 2
+        
+        # calculating traveled length penalty
+        self.traveled_length = 0
         
         if self.action_type == 'continuous':
             self.action_space = gym.spaces.Box(low=-10, high=10, shape=(2,))
@@ -105,6 +117,9 @@ class LimbEnv(gym.Env):
         # print("Goal:", self.goal)
         first_data_entry = np.concatenate((self.state, np.array([0.0, 0.0])), dtype=np.float32)
         self.data = torch.tensor(first_data_entry).to(self.device).unsqueeze(0)
+        if np.random.rand() < self.full_reset_prob:
+            self.hidden = (torch.zeros(self.num_layers, 1, self.hidden_dim).to(self.device),
+                           torch.zeros(self.num_layers, 1, self.hidden_dim).to(self.device))
         return np.append(self.state, self.goal), {}
     
     def step(self, action):
@@ -124,6 +139,10 @@ class LimbEnv(gym.Env):
                 action = np.array([10, 10]).astype(np.float32)
         else:
             action = np.array([action//21 - 10, action%21 - 10]).astype(np.float32)
+        
+        if self.domain_randomization:
+            if np.random.rand() < 0.3:
+                action = action * np.random.uniform(self.amp_scalar_low, self.amp_scalar_high)
         
         current_data_entry = torch.tensor(np.concatenate((self.state, action))).to(self.device).unsqueeze(0)
         self.data = torch.cat((self.data, current_data_entry), dim=0)
@@ -157,7 +176,10 @@ class LimbEnv(gym.Env):
             vel = (self.state[:2] - prev_state[:2]) / self.dt
             self.state[2:] = vel
         # compute reward
-        reward = self.compute_reward(self.state, self.goal, self.goal_tolerance)
+        reward, rew_comp = self.compute_reward(self.state, self.goal, self.goal_tolerance)
+        
+        # compute total traveled length
+        self.traveled_length += np.linalg.norm(delta_states[:2])
         
         #termination condition
         done = self.check_termination()
@@ -165,7 +187,7 @@ class LimbEnv(gym.Env):
         if self.render_mode == "human":
             self.render()
     
-        return np.append(self.state, self.goal), reward, done, False, {} 
+        return np.append(self.state, self.goal), reward, done, False, rew_comp 
     
     def render(self):
         if self.render_mode == 'human':
@@ -215,7 +237,12 @@ class LimbEnv(gym.Env):
     
     def compute_reward(self, state, goal, action):
         # idea from openai gym's reacher-v2 reward function
-        return - np.linalg.norm(state[:2] - goal) - np.sum(action**2)
+        reward_components = {}
+        reward_components['reach_rew'] = - self.reach_pen_weight*(np.linalg.norm(state[:2] - goal) + np.sum(action**2))
+        reward_components['vel_rew'] = - self.vel_pen_weight*np.linalg.norm(state[2:])
+        if self.check_termination():
+            reward_components['path_rew'] = - self.path_pen_weight*(self.traveled_length - np.linalg.norm(state[:2] - goal) + 1)
+        return sum(reward_components.values()), reward_components
     
     def check_termination(self):
         if self.state[0] > self.theta_limit or self.state[0] < -self.theta_limit or self.state[1] > self.theta_limit or self.state[1] < -self.theta_limit:
