@@ -28,7 +28,7 @@ class Visualizer(Node):
         self.angle_subscriber_ = self.create_subscription(Angles, 'limb_angles', self.angle_listener_callback, 1)
         self.prediction_subscriber_ = self.create_subscription(Angles, 'prediction', self.prediction_listener_callback, 1)
         self.timer = self.create_timer(0.05, self.timer_callback)
-        self.fig, self.ax = plt.subplots(figsize=(5, 5))
+        self.fig, self.ax = plt.subplots(figsize=(7, 7))
         self.ax.set_xlim(-100, 100)
         self.ax.set_ylim(-100, 100)
         self.traj_pts = pd.read_csv(self.traj_path)

@@ -69,7 +69,7 @@ class PolicyRunner(Node):
         self.policy_path = self.get_parameter('policy_path').get_parameter_value().string_value
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model = Actor().to(self.device)
-        print("Hi------------------")
+        # print("Hi------------------")
         # print(torch.load(self.policy_path, map_location=self.device, weights_only=True))
         self.model.load_state_dict(torch.load(self.policy_path, map_location=self.device, weights_only=True)[0])
         self.model.eval()

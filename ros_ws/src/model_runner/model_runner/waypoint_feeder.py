@@ -39,8 +39,14 @@ class Feeder(Node):
             start.data = True
             self.controller_publisher_.publish(start)
             self.start = start
-        # if goal is reached, increment counter
-        if np.linalg.norm(curr_angle - self.current_goal) < 3:
+        # if goal is reached, increment counter/get counter logic
+        # find index of the the goal that is closest to the current angle
+        pts = self.traj_pts.values
+        dist = np.linalg.norm(pts - curr_angle, axis=1)
+        counter = np.argmin(dist)
+        # if self.counter < counter and np.linalg.norm(curr_angle - self.current_goal) < 10:
+        #     self.counter = counter
+        if np.linalg.norm(curr_angle - self.current_goal) < 10:
             self.counter += 1
         
         # send the next goal
