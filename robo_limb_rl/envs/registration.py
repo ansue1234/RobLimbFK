@@ -8,6 +8,13 @@ register(
 )
 
 register(
+    id="LimbEnvMedium-v0",
+    entry_point="robo_limb_rl.envs.limb_env:LimbEnvMedium",
+    max_episode_steps=1000,
+    reward_threshold=10000,
+)
+
+register(
     id="SafeLimbEnv-v0",
     entry_point="robo_limb_rl.envs.limb_env:SafeLimbEnv",
     max_episode_steps=500,
