@@ -15,6 +15,8 @@ from stable_baselines3.common.buffers import ReplayBuffer
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 from robo_limb_rl.envs.limb_env import LimbEnv
+from robo_limb_rl.arch.Actor_Critic_net import RLAgent
+from robo_limb_rl.utils.utils import TrajReplayBuffer
 
 @dataclass
 class Args:
@@ -73,66 +75,6 @@ def make_env(env_id, seed, idx, capture_video, run_name, config_path="./yaml/def
     return thunk
 
 
-# ALGO LOGIC: initialize agent here:
-class SoftQNetwork(nn.Module):
-    def __init__(self, env):
-        super().__init__()
-        self.fc1 = nn.Linear(np.array(env.single_observation_space.shape).prod() + np.prod(env.single_action_space.shape), 256)
-        self.fc2 = nn.Linear(256, 256)
-        self.fc3 = nn.Linear(256, 1)
-
-    def forward(self, x, a):
-        x = torch.cat([x, a], 1)
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        x = self.fc3(x)
-        return x
-
-
-LOG_STD_MAX = 2
-LOG_STD_MIN = -5
-
-
-class Actor(nn.Module):
-    def __init__(self, env):
-        super().__init__()
-        self.fc1 = nn.Linear(np.array(env.single_observation_space.shape).prod(), 256)
-        self.fc2 = nn.Linear(256, 256)
-        self.fc_mean = nn.Linear(256, np.prod(env.single_action_space.shape))
-        self.fc_logstd = nn.Linear(256, np.prod(env.single_action_space.shape))
-        # action rescaling
-        self.register_buffer(
-            "action_scale", torch.tensor((env.action_space.high - env.action_space.low) / 2.0, dtype=torch.float32)
-        )
-        self.register_buffer(
-            "action_bias", torch.tensor((env.action_space.high + env.action_space.low) / 2.0, dtype=torch.float32)
-        )
-
-    def forward(self, x):
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        mean = self.fc_mean(x)
-        log_std = self.fc_logstd(x)
-        log_std = torch.tanh(log_std)
-        log_std = LOG_STD_MIN + 0.5 * (LOG_STD_MAX - LOG_STD_MIN) * (log_std + 1)  # From SpinUp / Denis Yarats
-
-        return mean, log_std
-
-    def get_action(self, x):
-        mean, log_std = self(x)
-        std = log_std.exp()
-        normal = torch.distributions.Normal(mean, std)
-        x_t = normal.rsample()  # for reparameterization trick (mean + std * N(0,1))
-        y_t = torch.tanh(x_t)
-        action = y_t * self.action_scale + self.action_bias
-        log_prob = normal.log_prob(x_t)
-        # Enforcing Action Bound
-        log_prob -= torch.log(self.action_scale * (1 - y_t.pow(2)) + 1e-6)
-        log_prob = log_prob.sum(1, keepdim=True)
-        mean = torch.tanh(mean) * self.action_scale + self.action_bias
-        return action, log_prob, mean
-
-
 if __name__ == "__main__":
     args = tyro.cli(Args)
     run_name = f"{args.env_id}__{args.exp_name}__{args.seed}__{int(time.time())}"
@@ -167,17 +109,43 @@ if __name__ == "__main__":
     assert isinstance(envs.single_action_space, gym.spaces.Box), "only continuous action space is supported"
 
     max_action = float(envs.single_action_space.high[0])
-
-    actor = Actor(envs).to(device)
-    qf1 = SoftQNetwork(envs).to(device)
-    qf2 = SoftQNetwork(envs).to(device)
-    qf1_target = SoftQNetwork(envs).to(device)
-    qf2_target = SoftQNetwork(envs).to(device)
-    qf1_target.load_state_dict(qf1.state_dict())
-    qf2_target.load_state_dict(qf2.state_dict())
-    q_optimizer = optim.Adam(list(qf1.parameters()) + list(qf2.parameters()), lr=args.q_lr)
-    actor_optimizer = optim.Adam(list(actor.parameters()), lr=args.policy_lr)
-
+    template_env = gym.make(args.env_id, config_path="./yaml/default_limb_env.yml", render_mode=None)
+    
+    # ALGO LOGIC: initialize agent here:
+    target_agent = RLAgent(template_env,
+                           head_type=args.head_type,
+                           agent='SAC',
+                           hidden_dim=args.hidden_dim,
+                           num_layers=args.num_layers,
+                           batch_size=args.batch_size,
+                           freeze_head=args.freeze_head,
+                           pretrained_model=None,
+                           included_power=False,
+                           device=device)
+    agent = RLAgent(template_env,
+                    head_type=args.head_type,
+                    agent='SAC',
+                    hidden_dim=args.hidden_dim,
+                    num_layers=args.num_layers,
+                    freeze_head=args.freeze_head,
+                    batch_size=args.batch_size,
+                    pretrained_model=None,
+                    included_power=False,
+                    device=device)
+    
+    target_agent.load_state_dict(agent.state_dict())
+    if args.freeze_head:
+        for param in agent.head.parameters():
+            param.requires_grad = False
+        q_optimizer = optim.Adam(list(agent.critic1.parameters()) 
+                               + list(agent.critic2.parameters()), lr=args.q_lr)
+        actor_optimizer = optim.Adam(list(agent.actor.parameters()), lr=args.policy_lr)
+    else:
+        q_optimizer = optim.Adam(list(agent.critic1.parameters()) 
+                               + list(agent.critic2.parameters())
+                               + list(agent.head.parameters()), lr=args.q_lr)
+        actor_optimizer = optim.Adam(list(agent.actor.parameters())
+                                   + list(agent.head.parameters()), lr=args.policy_lr)
     # Automatic entropy tuning
     if args.autotune:
         target_entropy = -torch.prod(torch.Tensor(envs.single_action_space.shape).to(device)).item()
@@ -188,13 +156,20 @@ if __name__ == "__main__":
         alpha = args.alpha
 
     envs.single_observation_space.dtype = np.float32
-    rb = ReplayBuffer(
-        args.buffer_size,
-        envs.single_observation_space,
-        envs.single_action_space,
-        device,
-        handle_timeout_termination=False,
-    )
+    
+    if args.head_type == 'mlp' or args.head_type == None:
+            rb = ReplayBuffer(
+                args.buffer_size,
+                envs.single_observation_space,
+                envs.single_action_space,
+                device,
+                handle_timeout_termination=False,
+            )
+    else:
+        rb = TrajReplayBuffer(max_size=args.buffer_size,
+                            device=device)
+    
+
     start_time = time.time()
     os.makedirs(f"../policies/{run_name}")
     # TRY NOT TO MODIFY: start the game
@@ -204,7 +179,7 @@ if __name__ == "__main__":
         if global_step < args.learning_starts:
             actions = np.array([envs.single_action_space.sample() for _ in range(envs.num_envs)])
         else:
-            actions, _, _ = actor.get_action(torch.Tensor(obs).to(device))
+            actions, _, _ = agent.get_action(torch.Tensor(obs).to(device))
             actions = actions.detach().cpu().numpy()
 
         # TRY NOT TO MODIFY: execute the game and log data.
@@ -232,14 +207,13 @@ if __name__ == "__main__":
         if global_step > args.learning_starts:
             data = rb.sample(args.batch_size)
             with torch.no_grad():
-                next_state_actions, next_state_log_pi, _ = actor.get_action(data.next_observations)
-                qf1_next_target = qf1_target(data.next_observations, next_state_actions)
-                qf2_next_target = qf2_target(data.next_observations, next_state_actions)
+                next_state_actions, next_state_log_pi, _ = agent.get_action(data.next_observations)
+                qf1_next_target, qf2_next_target = target_agent.forward_critic(data.next_observations, next_state_actions)
                 min_qf_next_target = torch.min(qf1_next_target, qf2_next_target) - alpha * next_state_log_pi
                 next_q_value = data.rewards.flatten() + (1 - data.dones.flatten()) * args.gamma * (min_qf_next_target).view(-1)
 
-            qf1_a_values = qf1(data.observations, data.actions).view(-1)
-            qf2_a_values = qf2(data.observations, data.actions).view(-1)
+            qf1_a_values, qf2_a_values = agent.forward_critic(data.observations, data.actions)
+            qf1_a_values, qf2_a_values = qf1_a_values.view(-1), qf2_a_values.view(-1)
             qf1_loss = F.mse_loss(qf1_a_values, next_q_value)
             qf2_loss = F.mse_loss(qf2_a_values, next_q_value)
             qf_loss = qf1_loss + qf2_loss
@@ -253,9 +227,8 @@ if __name__ == "__main__":
                 for _ in range(
                     args.policy_frequency
                 ):  # compensate for the delay by doing 'actor_update_interval' instead of 1
-                    pi, log_pi, _ = actor.get_action(data.observations)
-                    qf1_pi = qf1(data.observations, pi)
-                    qf2_pi = qf2(data.observations, pi)
+                    pi, log_pi, _ = agent.get_action(data.observations)
+                    qf1_pi, qf2_pi = agent.forward_critic(data.observations, pi)
                     min_qf_pi = torch.min(qf1_pi, qf2_pi)
                     actor_loss = ((alpha * log_pi) - min_qf_pi).mean()
 
@@ -265,7 +238,7 @@ if __name__ == "__main__":
 
                     if args.autotune:
                         with torch.no_grad():
-                            _, log_pi, _ = actor.get_action(data.observations)
+                            _, log_pi, _ = agent.get_action(data.observations)
                         alpha_loss = (-log_alpha.exp() * (log_pi + target_entropy)).mean()
 
                         a_optimizer.zero_grad()
@@ -275,9 +248,11 @@ if __name__ == "__main__":
 
             # update the target networks
             if global_step % args.target_network_frequency == 0:
-                for param, target_param in zip(qf1.parameters(), qf1_target.parameters()):
+                for param, target_param in zip(agent.critic1.parameters(), target_agent.critic1.parameters()):
                     target_param.data.copy_(args.tau * param.data + (1 - args.tau) * target_param.data)
-                for param, target_param in zip(qf2.parameters(), qf2_target.parameters()):
+                for param, target_param in zip(agent.critic2.parameters(), target_agent.critic2.parameters()):
+                    target_param.data.copy_(args.tau * param.data + (1 - args.tau) * target_param.data)
+                for param, target_param in zip(agent.head.parameters(), target_agent.head.parameters()):
                     target_param.data.copy_(args.tau * param.data + (1 - args.tau) * target_param.data)
 
             if global_step % 100 == 0:
@@ -292,12 +267,13 @@ if __name__ == "__main__":
                 writer.add_scalar("charts/SPS", int(global_step / (time.time() - start_time)), global_step)
                 if args.autotune:
                     writer.add_scalar("losses/alpha_loss", alpha_loss.item(), global_step)
+                    
         if (global_step + 1) % 10000 == 0:
-            model_path = f"../policies/{run_name}/{args.exp_name}.cleanrl_model"
-            torch.save((actor.state_dict(), qf1.state_dict(), qf2.state_dict()), model_path)
+            model_path = f"../policies/{run_name}/agent_{args.exp_name}.cleanrl_model"
+            torch.save((agent.state_dict()), model_path)
             print(f"model saved to {model_path}")
-    model_path = f"../policies/{run_name}/{args.exp_name}.cleanrl_model"
-    torch.save((actor.state_dict(), qf1.state_dict(), qf2.state_dict()), model_path)
+    model_path = f"../policies/{run_name}/agent_{args.exp_name}.cleanrl_model"
+    torch.save((agent.state_dict()), model_path)
     print(f"model saved to {model_path}")
     
     envs.close()

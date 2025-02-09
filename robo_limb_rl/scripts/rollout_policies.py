@@ -7,7 +7,7 @@ import gymnasium as gym
 import numpy as np
 from robo_limb_rl.envs.limb_env import LimbEnv
 from tqdm import tqdm
-from sac_cont_action import Actor, make_env
+from robo_limb_rl.scripts.sac_cont_action import Actor, make_env
 
 def load_env(seed, render_mode='human'):
     env = gym.make('LimbEnv-v0', config_path='./yaml/testing_limb_env.yml', render_mode=render_mode, seed=seed)

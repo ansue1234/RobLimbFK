@@ -153,14 +153,21 @@ class LimbEnv(gym.Env):
         self.traveled_length = 0
         self.power_pos_x, self.power_pos_y = 0, 0
         self.power_neg_x, self.power_neg_y = 0, 0
+        action = np.array([0.0, 0.0])
         if np.random.rand() < self.full_reset_prob:
             self.state = self.np_random.uniform(-75, 75, 4).astype(np.float32)
             self.hidden = (torch.zeros(self.num_layers, 1, self.hidden_dim).to(self.device),
                            torch.zeros(self.num_layers, 1, self.hidden_dim).to(self.device))
             print("Full Reset")
         if self.include_power_calc:
-            return np.append(np.append(self.state, [self.power_pos_x, self.power_pos_y, self.power_neg_x, self.power_neg_y]), self.goal), {}
-        return np.append(self.state, self.goal), {}
+            return np.append(np.append(self.state, 
+                                       [action[0], 
+                                        action[1], 
+                                        self.power_pos_x, 
+                                        self.power_pos_y, 
+                                        self.power_neg_x, 
+                                        self.power_neg_y]), self.goal), {}
+        return np.append(np.append(self.state, action), self.goal), {}
     
     def step(self, action):
         # prep data
@@ -246,8 +253,14 @@ class LimbEnv(gym.Env):
             self.render()
 
         if self.include_power_calc:
-            return np.append(np.append(self.state, [self.power_pos_x, self.power_pos_y, self.power_neg_x, self.power_neg_y]), self.goal), reward, done, False, rew_comp
-        return np.append(self.state, self.goal), reward, done, False, rew_comp 
+            return np.append(np.append(self.state, 
+                                       [action[0], 
+                                        action[1], 
+                                        self.power_pos_x, 
+                                        self.power_pos_y, 
+                                        self.power_neg_x, 
+                                        self.power_neg_y]), self.goal), reward, done, False, rew_comp
+        return np.append(np.append(self.state, action), self.goal), reward, done, False, rew_comp 
     
     def render(self):
         if self.render_mode == 'human':

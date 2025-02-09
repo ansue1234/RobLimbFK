@@ -175,46 +175,51 @@ class TD3Actor(nn.Module):
 
 class RLAgent(nn.Module):
     def __init__(self,
-                 env,
+                 observation_space,
+                 action_space,
                  head_type='mlp',
                  agent='SAC',
                  hidden_dim=256,
                  num_layers=1,
                  batch_size=1,
                  pretrained_model=None,
-                 included_power=False,
+                 freeze_head=False,
                  device='cpu'):
         super(RLAgent, self).__init__()
         self.device = device
         self.head_type = head_type
         self.hidden = None  # For storing hidden states of recurrent heads
 
-        state_dim = 6 if included_power else np.prod(env.observation_space.shape)
+        self.state_dim = 6 
         # Initialize the shared head
         if head_type == 'seq2seq_encoder':
             self.head = Seq2SeqEncoderOnly(6, hidden_dim, num_layers, batch_size, pretrained_model, device)
         elif head_type == 'seq2seq_full':
             self.head = Seq2SeqFullHead(6, hidden_dim, num_layers, batch_size, pretrained_model, device)
         elif head_type == 'mlp':
-            self.head = MLPHead(np.prod(env.observation_space.shape), hidden_dim)
+            self.head = MLPHead(np.prod(observation_space.shape), hidden_dim)
         else:
             self.head = EmptyHead()
-            hidden_dim = np.prod(env.observation_space.shape)
+            hidden_dim = np.prod(observation_space.shape)
 
         # Initialize actor
         if agent == 'SAC':
-            self.actor = SACActor(hidden_dim + np.prod(env.observation_space.shape) - state_dim, env.action_space)
+            self.actor = SACActor(hidden_dim + np.prod(observation_space.shape) - state_dim, action_space)
         elif agent == 'TD3':
-            self.actor = TD3Actor(hidden_dim + np.prod(env.observation_space.shape) - state_dim, env.action_space)
+            self.actor = TD3Actor(hidden_dim + np.prod(observation_space.shape) - state_dim, action_space)
 
         # Initialize critics
-        self.critic1 = QNetwork(hidden_dim+env.action_space.shape[0])
-        self.critic2 = QNetwork(hidden_dim+env.action_space.shape[0])
-        
+        self.critic1 = QNetwork(hidden_dim + np.prod(observation_space.shape) - state_dim + np.prod(action_space.shape))
+        self.critic2 = QNetwork(hidden_dim + np.prod(observation_space.shape) - state_dim + np.prod(action_space.shape))
+        self.freeze_head = freeze_head
         self.hidden = (torch.zeros(num_layers, batch_size, hidden_dim).to(self.device),
                        torch.zeros(num_layers, batch_size, hidden_dim).to(self.device))
 
     def _get_features(self, x):
+        if self.freeze_head:
+            with torch.no_grad():
+                return self.head(x, self.hidden)
+        else:
             return self.head(x, self.hidden)
 
     def get_action(self, x):
@@ -222,8 +227,8 @@ class RLAgent(nn.Module):
         if not isinstance(x, torch.Tensor):
             x = torch.FloatTensor(x).to(self.device)
         # Add necessary dimensions for sequential heads
-        obs = x[:,:,:6]
-        power_goal = x[:,:,6:]
+        obs = x[:,:,:self.state_dim]
+        power_goal = x[:,:,self.state_dim:]
 
         # Get features and update hidden state
         features, new_hidden = self._get_features(obs, self.hidden)
@@ -237,8 +242,8 @@ class RLAgent(nn.Module):
 
     def forward_critic(self, x, a):
         # Process state through the shared head
-        obs = x[:,:,:6]
-        power_goal = x[:,:,6:]
+        obs = x[:,:,:self.state_dim]
+        power_goal = x[:,:,self.state_dim:]
         features, _ = self._get_features(obs, self.hidden)
         features = torch.cat((features, power_goal), dim=2)
         # Forward through critics

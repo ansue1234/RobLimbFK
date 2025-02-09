@@ -84,12 +84,9 @@ class TrajData():
         self.dones = done
 
 class TrajReplayBuffer():
-    def __init__(self, max_size, state_dim, action_dim, seq_len, device, sample_type='random_bootstrap'):
+    def __init__(self, max_size, device):
         self.max_size = max_size
-        self.state_dim = state_dim
-        self.action_dim = action_dim
         self.device = device
-        self.seq_len = seq_len
         self.size = 0
         self.trajs = []
         self.trajs_next_states = []
@@ -97,21 +94,23 @@ class TrajReplayBuffer():
         self.trajs_rewards = []
         self.trajs_dones = []
         self.trajs_lengths = [0]
+        self.trajs_info = []
         
         self.current_traj = []
         self.current_traj_next_states = []
         self.current_traj_actions = []
         self.current_traj_rewards = []
         self.current_traj_dones = []
-        self.sample_type = sample_type
+        self.current_traj_info = []
     
-    def add(self, state, next_state, action, reward, done):
+    def add(self, state, next_state, action, reward, done, infos):
 
         self.current_traj.append(state)
         self.current_traj_next_states.append(next_state)
         self.current_traj_actions.append(action)
         self.current_traj_rewards.append(reward)
         self.current_traj_dones.append(done)
+        self.current_traj_info.append(infos)
         self.trajs_lengths[-1] += 1
         
         if done:
@@ -120,12 +119,14 @@ class TrajReplayBuffer():
             self.trajs_actions.append(torch.tensor(self.current_traj_actions).to(self.device))
             self.trajs_rewards.append(torch.tensor(self.current_traj_rewards).to(self.device))
             self.trajs_dones.append(torch.tensor(self.current_traj_dones).to(self.device))
+            self.trajs_info.append(self.current_traj_info)
             
             self.current_traj = []
             self.current_traj_next_states = []
             self.current_traj_actions = []
             self.current_traj_rewards = []
             self.current_traj_dones = []
+            self.current_traj_info = []
             self.trajs_lengths.append(0)
             
             if self.size < self.max_size:
@@ -162,29 +163,4 @@ class TrajReplayBuffer():
             padded_trajs_dones = padded_trajs_dones[:, -400:]
 
         return TrajData(padded_trajs, padded_trajs_next_states, padded_trajs_actions, padded_trajs_rewards, padded_trajs_dones)
-        # traj_index = np.random.randint(0, self.size)
-        # traj_states = np.array(self.trajs[traj_index])
-        # traj_next_states = np.array(self.trajs_next_states[traj_index])
-        # actions = np.array(self.trajs_actions[traj_index])
-        # rewards = np.array(self.trajs_rewards[traj_index])
-        # dones = np.array(self.trajs_dones[traj_index])
         
-        # if self.sample_type == 'random_bootstrap' and len(traj_states) > self.seq_len:
-        #     traj_start_point = np.random.randint(0, len(traj_states) - self.seq_len)
-            # print(traj_states.shape)
-            # print(traj_next_states.shape)
-            # print(actions.shape)
-            # print(rewards.shape)
-            # print(dones.shape)
-            # return TrajData(torch.tensor(traj_states[traj_start_point:traj_start_point+self.seq_len]).to(self.device),
-            #                 torch.tensor(traj_next_states[traj_start_point:traj_start_point+self.seq_len]).to(self.device),
-            #                 torch.tensor(actions[traj_start_point:traj_start_point+self.seq_len]).to(self.device),
-            #                 torch.tensor(rewards[traj_start_point:traj_start_point+self.seq_len]).to(self.device),
-            #                 torch.tensor(dones[traj_start_point:traj_start_point+self.seq_len]).to(self.device))
-        # else:
-        # return TrajData(torch.tensor(traj_states).to(self.device),
-        #                 torch.tensor(traj_next_states).to(self.device),
-        #                 torch.tensor(actions).to(self.device),
-        #                 torch.tensor(rewards).to(self.device),
-        #                 torch.tensor(dones).to(self.device))
-        # traj_start_point = np.random.randint(0, len(traj_states) - self.seq_len)
