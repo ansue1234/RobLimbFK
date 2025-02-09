@@ -2,47 +2,104 @@ import torch.nn as nn
 import torch
 import numpy as np
 import torch.nn.functional as F
-from robo_limb_ml.models.fk_seq2seq import FK_Seq2Seq
+from robo_limb_ml.models.fk_seq2seq import FK_SEQ2SEQ
 
 class Seq2SeqEncoderOnly(nn.Module):
-    def __init__(self, input_dim, hidden_dim, num_layers, pretrained_model=None):
-        super().__init__()
-        # create a seq2seq net and then strip the decoder
-        seq2seq_net = FK_Seq2Seq(input_size=input_dim,
+    def __init__(self, input_dim, hidden_dim, num_layers, batch_size, pretrained_model=None, device='cpu'):
+        super(Seq2SeqEncoderOnly, self).__init__()
+        self.device = device
+        seq2seq_net = FK_SEQ2SEQ(input_size=input_dim,
                                  embedding_size=hidden_dim,
                                  num_layers=num_layers,
                                  batch_first=True,
-                                 batch_size=1,
-                                output_size,
-                                device,
-                                encoder_type="LSTM",
-                                decoder_type="LSTM",
-                                domain_boundary=100,
-                                pred_len=1,
-                                attention=False,
-                                teacher_forcing_ratio=0.75)
+                                 batch_size=batch_size,
+                                 output_size=4,
+                                 device=self.device,
+                                 encoder_type="LSTM",
+                                 decoder_type="LSTM",
+                                 domain_boundary=100,
+                                 pred_len=1,
+                                 attention=False,
+                                 teacher_forcing_ratio=0.75)
+        if pretrained_model is not None:
+            # Load the entire model from the checkpoint
+            loaded_model = torch.load(pretrained_model, map_location=self.device)
+            seq2seq_net.load_state_dict(loaded_model)
+
+        self.encoder = seq2seq_net.encoder
+        # Move the encoder to the specified device
+        self.encoder.to(self.device)
 
     def forward(self, x, hidden):
-        out, (h_n, c_n) = self.lstm(x, hidden)
-        return out, (h_n, c_n)
+        # Ensure input is on the correct device
+        x = x.to(self.device)
+        # Forward pass through the encoder
+        out, hidden = self.encoder(x, hidden)
+        out = out[:, -1, :]
+        return out, hidden
 
+class Seq2SeqFullHead(nn.Module):
+    def __init__(self, input_dim, hidden_dim, num_layers, batch_size, pretrained_model=None, device='cpu'):
+        super(Seq2SeqFullHead, self).__init__()
+        self.device = device
+        seq2seq_net = FK_SEQ2SEQ(input_size=input_dim,
+                                     embedding_size=hidden_dim,
+                                     num_layers=num_layers,
+                                     batch_first=True,
+                                     batch_size=batch_size,
+                                     output_size=4,
+                                     device=self.device,
+                                     encoder_type="LSTM",
+                                     decoder_type="LSTM",
+                                     domain_boundary=100,
+                                     pred_len=1,
+                                     attention=False,
+                                     teacher_forcing_ratio=0.75)
+        
+        if pretrained_model is not None:
+            loaded_model = torch.load(pretrained_model, map_location=self.device)
+            seq2seq_net.load_state_dict(loaded_model)
+            # Load components from the pretrained model
+        self.encoder = seq2seq_net.encoder
+        self.decoder = seq2seq_net.decoder.decoder  # Access the underlying LSTM/RNN module
+        # self.decoder_input_size = seq2seq_net.decoder.decoder.input_size
+        
+        # Ensure components are on the correct device
+        self.encoder.to(self.device)
+        self.decoder.to(self.device)
+
+    def forward(self, x, hidden):
+        # print("main forward", x.shape)
+        encoder_out, encoder_hidden = self.encoder(x, hidden)
+        decoder_input = x[:, -1:, :]
+        decoder_hidden = encoder_hidden
+        decoder_out, decoder_hidden = self.decoder(decoder_input, decoder_hidden, encoder_out)
+        decoder_out = decoder_out[:, -1, :]
+        return decoder_out, encoder_hidden
 
 
 class MLPHead(nn.Module):
     def __init__(self, input_dim, hidden_dim):
-        super().__init__()
+        super(MLPHead, self).__init__()
         self.nn = nn.Sequential(
                     nn.Linear(input_dim, hidden_dim),
                     nn.ReLU(),
                     nn.Linear(hidden_dim, hidden_dim))
 
-    def forward(self, x):
-        return self.nn(x)
+    def forward(self, x, hidden=None):
+        return self.nn(x), None
+
+class EmptyHead(nn.Module):
+    def __init__(self):
+        super(EmptyHead, self).__init__()
+
+    def forward(self, x, hidden=None):
+        return x, None
 
 class QNetwork(nn.Module):
-    def __init__(self, env):
+    def __init__(self, input_dim):
         super().__init__()
-        self.fc1 = nn.Linear(np.array(env.single_observation_space.shape).prod() + np.prod(env.single_action_space.shape), 256)
+        self.fc1 = nn.Linear(input_dim, 256)
         self.fc2 = nn.Linear(256, 256)
         self.fc3 = nn.Linear(256, 1)
 
@@ -55,18 +112,18 @@ class QNetwork(nn.Module):
 
 
 class SACActor(nn.Module):
-    def __init__(self, env):
+    def __init__(self, input_dim, action_space):
         super().__init__()
-        self.fc1 = nn.Linear(np.array(env.single_observation_space.shape).prod(), 256)
+        self.fc1 = nn.Linear(input_dim, 256)
         self.fc2 = nn.Linear(256, 256)
-        self.fc_mean = nn.Linear(256, np.prod(env.single_action_space.shape))
-        self.fc_logstd = nn.Linear(256, np.prod(env.single_action_space.shape))
+        self.fc_mean = nn.Linear(256, np.prod(action_space.shape))
+        self.fc_logstd = nn.Linear(256, np.prod(action_space.shape))
         # action rescaling
         self.register_buffer(
-            "action_scale", torch.tensor((env.action_space.high - env.action_space.low) / 2.0, dtype=torch.float32)
+            "action_scale", torch.tensor((action_space.high - action_space.low) / 2.0, dtype=torch.float32)
         )
         self.register_buffer(
-            "action_bias", torch.tensor((env.action_space.high + env.action_space.low) / 2.0, dtype=torch.float32)
+            "action_bias", torch.tensor((action_space.high + action_space.low) / 2.0, dtype=torch.float32)
         )
         self.LOG_STD_MAX = 2
         self.LOG_STD_MIN = -5
@@ -96,17 +153,17 @@ class SACActor(nn.Module):
         return action, log_prob, mean
 
 class TD3Actor(nn.Module):
-    def __init__(self, env):
+    def __init__(self, input_dim, action_space):
         super().__init__()
-        self.fc1 = nn.Linear(np.array(env.single_observation_space.shape).prod(), 256)
+        self.fc1 = nn.Linear(input_dim, 256)
         self.fc2 = nn.Linear(256, 256)
-        self.fc_mu = nn.Linear(256, np.prod(env.single_action_space.shape))
+        self.fc_mu = nn.Linear(256, np.prod(action_space.shape))
         # action rescaling
         self.register_buffer(
-            "action_scale", torch.tensor((env.action_space.high - env.action_space.low) / 2.0, dtype=torch.float32)
+            "action_scale", torch.tensor((action_space.high - action_space.low) / 2.0, dtype=torch.float32)
         )
         self.register_buffer(
-            "action_bias", torch.tensor((env.action_space.high + env.action_space.low) / 2.0, dtype=torch.float32)
+            "action_bias", torch.tensor((action_space.high + action_space.low) / 2.0, dtype=torch.float32)
         )
 
     def forward(self, x):
@@ -115,3 +172,76 @@ class TD3Actor(nn.Module):
         x = torch.tanh(self.fc_mu(x))
         return x * self.action_scale + self.action_bias
 
+
+class RLAgent(nn.Module):
+    def __init__(self,
+                 env,
+                 head_type='mlp',
+                 agent='SAC',
+                 hidden_dim=256,
+                 num_layers=1,
+                 batch_size=1,
+                 pretrained_model=None,
+                 included_power=False,
+                 device='cpu'):
+        super(RLAgent, self).__init__()
+        self.device = device
+        self.head_type = head_type
+        self.hidden = None  # For storing hidden states of recurrent heads
+
+        state_dim = 6 if included_power else np.prod(env.observation_space.shape)
+        # Initialize the shared head
+        if head_type == 'seq2seq_encoder':
+            self.head = Seq2SeqEncoderOnly(6, hidden_dim, num_layers, batch_size, pretrained_model, device)
+        elif head_type == 'seq2seq_full':
+            self.head = Seq2SeqFullHead(6, hidden_dim, num_layers, batch_size, pretrained_model, device)
+        elif head_type == 'mlp':
+            self.head = MLPHead(np.prod(env.observation_space.shape), hidden_dim)
+        else:
+            self.head = EmptyHead()
+            hidden_dim = np.prod(env.observation_space.shape)
+
+        # Initialize actor
+        if agent == 'SAC':
+            self.actor = SACActor(hidden_dim + np.prod(env.observation_space.shape) - state_dim, env.action_space)
+        elif agent == 'TD3':
+            self.actor = TD3Actor(hidden_dim + np.prod(env.observation_space.shape) - state_dim, env.action_space)
+
+        # Initialize critics
+        self.critic1 = QNetwork(hidden_dim+env.action_space.shape[0])
+        self.critic2 = QNetwork(hidden_dim+env.action_space.shape[0])
+        
+        self.hidden = (torch.zeros(num_layers, batch_size, hidden_dim).to(self.device),
+                       torch.zeros(num_layers, batch_size, hidden_dim).to(self.device))
+
+    def _get_features(self, x):
+            return self.head(x, self.hidden)
+
+    def get_action(self, x):
+        # Ensure input is a tensor on the correct device
+        if not isinstance(x, torch.Tensor):
+            x = torch.FloatTensor(x).to(self.device)
+        # Add necessary dimensions for sequential heads
+        obs = x[:,:,:6]
+        power_goal = x[:,:,6:]
+
+        # Get features and update hidden state
+        features, new_hidden = self._get_features(obs, self.hidden)
+        if new_hidden is not None:
+            self.hidden = new_hidden.detach()
+
+        features = torch.cat((features, power_goal), dim=2)
+        # Get action from actor
+        action, log_prob, mean = self.actor.get_action(features)
+        return action, log_prob, mean
+
+    def forward_critic(self, x, a):
+        # Process state through the shared head
+        obs = x[:,:,:6]
+        power_goal = x[:,:,6:]
+        features, _ = self._get_features(obs, self.hidden)
+        features = torch.cat((features, power_goal), dim=2)
+        # Forward through critics
+        q1 = self.critic1(features, a)
+        q2 = self.critic2(features, a)
+        return q1, q2

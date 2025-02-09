@@ -79,9 +79,9 @@ class TrajData():
     def __init__(self, state, next_state, action, reward, done):
         self.observations = state
         self.next_observations = next_state
-        self.actions = action[:, -1]
-        self.rewards = reward[:, -1]
-        self.dones = done[:, -1]
+        self.actions = action
+        self.rewards = reward
+        self.dones = done
 
 class TrajReplayBuffer():
     def __init__(self, max_size, state_dim, action_dim, seq_len, device, sample_type='random_bootstrap'):
