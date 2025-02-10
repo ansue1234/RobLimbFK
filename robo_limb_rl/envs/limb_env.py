@@ -8,12 +8,12 @@ import yaml
 import random
 
 class LimbEnv(gym.Env):
-    # if included velocity, observation space is 8, otherwise 6
-    #      x, y, vel_x, vel_y, goal_x, goal_y (6)
-    #      x, y, vel_x, vel_y, goal_x, goal_y, goal_vel_x, goal_vel_y (8)
-    # if included power calculation, observation space is 12, otherwise 10
-    #      x, y, vel_x, vel_y, power_pos_x, power_pos_y, power_neg_x, power_neg_y, goal_x, goal_y (10)
-    #      x, y, vel_x, vel_y, power_pos_x, power_pos_y, power_neg_x, power_neg_y, goal_x, goal_y, goal_vel_x, goal_vel_y (12)
+    # if included velocity, observation space is 8, otherwise 10
+    #      x, y, vel_x, vel_y, action_x, action_y, goal_x, goal_y (8)
+    #      x, y, vel_x, vel_y, action_x, action_y, goal_x, goal_y, goal_vel_x, goal_vel_y (10)
+    # if included power calculation, observation space is 12, otherwise 14
+    #      x, y, vel_x, vel_y, action_x, action_y, power_pos_x, power_pos_y, power_neg_x, power_neg_y, goal_x, goal_y (12)
+    #      x, y, vel_x, vel_y, action_x, action_y, power_pos_x, power_pos_y, power_neg_x, power_neg_y, goal_x, goal_y, goal_vel_x, goal_vel_y (14)
     metadata = {
         "render_mode": ["human", None],
     }
@@ -49,6 +49,34 @@ class LimbEnv(gym.Env):
         self.include_velocity = config.get('include_velocity', False)
         self.render_mode = render_mode
         self.seed = seed
+        
+        print("Initializing Environment")
+        print("include_power_calc:", self.include_power_calc)
+        print("include_velocity:", self.include_velocity)
+        print("model_path:", self.model_path)
+        print("model_type:", self.model_type)
+        print("viz_type:", self.viz_type)
+        print("input_dim:", self.input_dim)
+        print("output_dim:", self.output_dim)
+        print("hidden_dim:", self.hidden_dim)
+        print("seq_len:", self.seq_len)
+        print("num_layers:", self.num_layers)
+        print("attention:", self.attention)
+        print("action_type:", self.action_type)
+        print("stateful:", self.stateful)
+        print("vel_type:", self.vel_type)
+        print("dt:", self.dt)
+        print("theta_limit:", self.theta_limit)
+        print("goal_tolerance:", self.goal_tolerance)
+        print("int_actions:", self.int_actions)
+        print("full_reset_prob:", self.full_reset_prob)
+        print("domain_randomization:", self.domain_randomization)
+        print("reach_pen_weight:", self.reach_pen_weight)
+        print("vel_pen_weight:", self.vel_pen_weight)
+        print("path_pen_weight:", self.path_pen_weight)
+        print("cooling_constant:", self.cooling_constant)
+        print("seed:", self.seed)
+         
         # Setting up model
         if seed is not None:
             random.seed(seed)
@@ -82,13 +110,13 @@ class LimbEnv(gym.Env):
             self.action_space = gym.spaces.Discrete(441)
             
         if self.include_power_calc:
-            self.observation_space = gym.spaces.Box(low=-self.theta_limit, high=self.theta_limit, shape=(10,))
+            self.observation_space = gym.spaces.Box(low=-self.theta_limit, high=self.theta_limit, shape=(12,))
             if self.include_velocity:
-                self.observation_space = gym.spaces.Box(low=-self.theta_limit, high=self.theta_limit, shape=(12,))
+                self.observation_space = gym.spaces.Box(low=-self.theta_limit, high=self.theta_limit, shape=(14,))
         else:
-            self.observation_space = gym.spaces.Box(low=-self.theta_limit, high=self.theta_limit, shape=(6,))
+            self.observation_space = gym.spaces.Box(low=-self.theta_limit, high=self.theta_limit, shape=(8,))
             if self.include_velocity:
-                self.observation_space = gym.spaces.Box(low=-self.theta_limit, high=self.theta_limit, shape=(8,))
+                self.observation_space = gym.spaces.Box(low=-self.theta_limit, high=self.theta_limit, shape=(10,))
             
         if seed:
             self.action_space.seed(seed)
@@ -113,14 +141,14 @@ class LimbEnv(gym.Env):
             self.scatter = self.ax.scatter([], [], c='blue', s=100)
             self.line, = self.ax.plot(self.x_path, self.y_path, 'r-', markersize=10)
         
-        self.velocity_arrow = self.ax.quiver(0, 0, 0, 0, 
-                                             angles='xy', scale_units='xy', 
-                                             scale=1, color='red')
-        
         self.goal_plot = self.ax.scatter(self.goal[0], self.goal[1], c='green', s=100, marker='x')  # Goal marker
-        self.goal_velocity_arrow = self.ax.quiver(self.goal[0], self.goal[1], self.goal[2], self.goal[3],
-                                                  angles='xy', scale_units='xy',
-                                                  scale=1, color='green')
+        if self.include_velocity:
+            self.goal_velocity_arrow = self.ax.quiver(self.goal[0], self.goal[1], self.goal[2], self.goal[3],
+                                                    angles='xy', scale_units='xy',
+                                                    scale=1, color='green')
+            self.velocity_arrow = self.ax.quiver(0, 0, 0, 0, 
+                                                angles='xy', scale_units='xy', 
+                                                scale=1, color='red')
         print("Environment Initialized")
         print("goal:", self.goal)
     def set_state(self, state):
@@ -159,6 +187,7 @@ class LimbEnv(gym.Env):
             self.hidden = (torch.zeros(self.num_layers, 1, self.hidden_dim).to(self.device),
                            torch.zeros(self.num_layers, 1, self.hidden_dim).to(self.device))
             print("Full Reset")
+
         if self.include_power_calc:
             return np.append(np.append(self.state, 
                                        [action[0], 
@@ -251,7 +280,7 @@ class LimbEnv(gym.Env):
         
         if self.render_mode == "human":
             self.render()
-
+            
         if self.include_power_calc:
             return np.append(np.append(self.state, 
                                        [action[0], 
@@ -274,12 +303,15 @@ class LimbEnv(gym.Env):
                 self.line.set_xdata(self.x_path)
                 self.line.set_ydata(self.y_path)
             self.goal_plot.set_offsets([self.goal[0], self.goal[1]])
-            self.goal_velocity_arrow.set_offsets([self.goal[0], self.goal[1]])
-            self.goal_velocity_arrow.set_UVC(self.goal[2], self.goal[3])
             
-            # Update the velocity arrow
-            self.velocity_arrow.set_offsets([self.state[0], self.state[1]])
-            self.velocity_arrow.set_UVC(self.state[2], self.state[3])
+            if self.include_velocity:
+                # Update the goal velocity arrow
+                self.goal_velocity_arrow.set_offsets([self.goal[0], self.goal[1]])
+                self.goal_velocity_arrow.set_UVC(self.goal[2], self.goal[3])
+                
+                # Update the velocity arrow
+                self.velocity_arrow.set_offsets([self.state[0], self.state[1]])
+                self.velocity_arrow.set_UVC(self.state[2], self.state[3])
             
             self.ax.relim()
             self.ax.autoscale_view()
@@ -355,7 +387,7 @@ class LimbEnvMedium(LimbEnv):
         return super().step(action)
     
     def check_termination(self):
-        return self.t >= 200
+        return self.t >= 300
 
 
 class SafeLimbEnv(LimbEnv):

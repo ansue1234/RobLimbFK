@@ -10,8 +10,8 @@ rm -rf ~/miniconda3/miniconda.sh
 sleep 5s
 source ~/.bashrc
 echo Creating Conda Env
-conda env create -f environment_ml.yml
-conda activate soft_limb_ml
+conda env create -f environment_rl.yml
+conda activate soft_limb_rl
 echo Setting up Git
 git config --global user.email "ansue1234@gmail.com"
 git config --global user.name "Andrew Sue"

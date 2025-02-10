@@ -188,8 +188,8 @@ class RLAgent(nn.Module):
         super(RLAgent, self).__init__()
         self.device = device
         self.head_type = head_type
-        self.hidden = None  # For storing hidden states of recurrent heads
-
+        self.num_layers = num_layers
+        self.hidden_dim = hidden_dim
         self.state_dim = 6 
         # Initialize the shared head
         if head_type == 'seq2seq_encoder':
@@ -204,38 +204,38 @@ class RLAgent(nn.Module):
 
         # Initialize actor
         if agent == 'SAC':
-            self.actor = SACActor(hidden_dim + np.prod(observation_space.shape) - state_dim, action_space)
+            self.actor = SACActor(hidden_dim + np.prod(observation_space.shape) - self.state_dim, action_space)
         elif agent == 'TD3':
-            self.actor = TD3Actor(hidden_dim + np.prod(observation_space.shape) - state_dim, action_space)
+            self.actor = TD3Actor(hidden_dim + np.prod(observation_space.shape) - self.state_dim, action_space)
 
         # Initialize critics
-        self.critic1 = QNetwork(hidden_dim + np.prod(observation_space.shape) - state_dim + np.prod(action_space.shape))
-        self.critic2 = QNetwork(hidden_dim + np.prod(observation_space.shape) - state_dim + np.prod(action_space.shape))
+        self.critic1 = QNetwork(hidden_dim + np.prod(observation_space.shape) - self.state_dim + np.prod(action_space.shape))
+        self.critic2 = QNetwork(hidden_dim + np.prod(observation_space.shape) - self.state_dim + np.prod(action_space.shape))
         self.freeze_head = freeze_head
-        self.hidden = (torch.zeros(num_layers, batch_size, hidden_dim).to(self.device),
-                       torch.zeros(num_layers, batch_size, hidden_dim).to(self.device))
 
     def _get_features(self, x):
+        # No context because each batch contains whole trajectory
+        hidden = (torch.zeros(self.num_layers, x.shape[0], self.hidden_dim).to(self.device),
+                  torch.zeros(self.num_layers, x.shape[0], self.hidden_dim).to(self.device))
         if self.freeze_head:
             with torch.no_grad():
-                return self.head(x, self.hidden)
+                return self.head(x, hidden)
         else:
-            return self.head(x, self.hidden)
+            return self.head(x, hidden)
 
     def get_action(self, x):
         # Ensure input is a tensor on the correct device
-        if not isinstance(x, torch.Tensor):
-            x = torch.FloatTensor(x).to(self.device)
+        # print(x)
+        # if not isinstance(x, torch.Tensor):
+        #     x = torch.FloatTensor(x).to(self.device)
         # Add necessary dimensions for sequential heads
         obs = x[:,:,:self.state_dim]
-        power_goal = x[:,:,self.state_dim:]
+        power_goal = x[:,-1, self.state_dim:]
 
         # Get features and update hidden state
-        features, new_hidden = self._get_features(obs, self.hidden)
-        if new_hidden is not None:
-            self.hidden = new_hidden.detach()
+        features, _ = self._get_features(obs)
 
-        features = torch.cat((features, power_goal), dim=2)
+        features = torch.cat((features, power_goal), dim=1)
         # Get action from actor
         action, log_prob, mean = self.actor.get_action(features)
         return action, log_prob, mean
@@ -243,9 +243,10 @@ class RLAgent(nn.Module):
     def forward_critic(self, x, a):
         # Process state through the shared head
         obs = x[:,:,:self.state_dim]
-        power_goal = x[:,:,self.state_dim:]
-        features, _ = self._get_features(obs, self.hidden)
-        features = torch.cat((features, power_goal), dim=2)
+        power_goal = x[:,-1,self.state_dim:]
+        features, _ = self._get_features(obs)
+        
+        features = torch.cat((features, power_goal), dim=1)
         # Forward through critics
         q1 = self.critic1(features, a)
         q2 = self.critic2(features, a)

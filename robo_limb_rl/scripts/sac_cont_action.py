@@ -32,7 +32,7 @@ class Args:
     """if toggled, this experiment will be tracked with Weights and Biases"""
     wandb_project_name: str = "cleanRL"
     """the wandb's project name"""
-    wandb_entity: str = None
+    wandb_entity: str = ""
     """the entity (team) of wandb's project"""
     capture_video: bool = False
     """whether to capture videos of the agent performances (check out `videos` folder)"""
@@ -58,15 +58,27 @@ class Args:
     """the learning rate of the Q network network optimizer"""
     policy_frequency: int = 2
     """the frequency of training policy (delayed)"""
-    target_network_frequency: int = 1  # Denis Yarats' implementation delays this by 2.
+    target_network_frequency: int = 2  # Denis Yarats' implementation delays this by 2.
     """the frequency of updates for the target nerworks"""
     alpha: float = 0.2
     """Entropy regularization coefficient."""
     autotune: bool = True
     """automatic tuning of the entropy coefficient"""
+    
+    #Config file path
+    config_path: str = "./yaml/default_limb_env.yml"
+    """the path to the config file"""
+    head_type: str = 'seq2seq_encoder'
+    """the type of the head network"""
+    freeze_head: bool = False
+    """if toggled, the head network will be frozen"""
+    pretrained_model: bool = False
+    """the path to the pretrained model"""
+    clip_norm: float = 1.0
+    """max norm for gradient clipping"""
 
 
-def make_env(env_id, seed, idx, capture_video, run_name, config_path="./yaml/default_limb_env.yml"):
+def make_env(env_id, seed, idx, capture_video, run_name, config_path):
     def thunk():
         env = gym.make(env_id, seed=seed, config_path=config_path, render_mode=None)
         env = gym.wrappers.RecordEpisodeStatistics(env)
@@ -103,35 +115,42 @@ if __name__ == "__main__":
     torch.backends.cudnn.deterministic = args.torch_deterministic
 
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
-
+    
     # env setup
-    envs = gym.vector.SyncVectorEnv([make_env(args.env_id, args.seed, 0, args.capture_video, run_name)])
+    envs = gym.vector.SyncVectorEnv([make_env(args.env_id, args.seed, 0, args.capture_video, run_name, args.config_path)])
     assert isinstance(envs.single_action_space, gym.spaces.Box), "only continuous action space is supported"
 
     max_action = float(envs.single_action_space.high[0])
-    template_env = gym.make(args.env_id, config_path="./yaml/default_limb_env.yml", render_mode=None)
+    template_env = gym.make(args.env_id, config_path=args.config_path, render_mode=None)
+    hidden_dim = template_env.unwrapped.hidden_dim
+    num_layers = template_env.unwrapped.num_layers
+    included_power = template_env.unwrapped.include_power_calc
+    if args.pretrained_model:
+        pretrained_model_path = template_env.model_path
+    else:
+        pretrained_model_path = None
     
     # ALGO LOGIC: initialize agent here:
-    target_agent = RLAgent(template_env,
+    target_agent = RLAgent(envs.single_observation_space,
+                           envs.single_action_space,
                            head_type=args.head_type,
                            agent='SAC',
-                           hidden_dim=args.hidden_dim,
-                           num_layers=args.num_layers,
+                           hidden_dim=hidden_dim,
+                           num_layers=num_layers,
                            batch_size=args.batch_size,
                            freeze_head=args.freeze_head,
-                           pretrained_model=None,
-                           included_power=False,
-                           device=device)
-    agent = RLAgent(template_env,
+                           pretrained_model=pretrained_model_path,
+                           device=device).to(device)
+    agent = RLAgent(envs.single_observation_space,
+                    envs.single_action_space,
                     head_type=args.head_type,
                     agent='SAC',
-                    hidden_dim=args.hidden_dim,
-                    num_layers=args.num_layers,
+                    hidden_dim=hidden_dim,
+                    num_layers=num_layers,
                     freeze_head=args.freeze_head,
                     batch_size=args.batch_size,
-                    pretrained_model=None,
-                    included_power=False,
-                    device=device)
+                    pretrained_model=pretrained_model_path,
+                    device=device).to(device)
     
     target_agent.load_state_dict(agent.state_dict())
     if args.freeze_head:
@@ -171,7 +190,7 @@ if __name__ == "__main__":
     
 
     start_time = time.time()
-    os.makedirs(f"../policies/{run_name}")
+    os.makedirs(f"../policies/{run_name}", exist_ok=True)
     # TRY NOT TO MODIFY: start the game
     obs, _ = envs.reset(seed=args.seed)
     for global_step in tqdm(range(args.total_timesteps)):
@@ -179,12 +198,12 @@ if __name__ == "__main__":
         if global_step < args.learning_starts:
             actions = np.array([envs.single_action_space.sample() for _ in range(envs.num_envs)])
         else:
-            actions, _, _ = agent.get_action(torch.Tensor(obs).to(device))
+            actions, _, _ = agent.get_action(torch.Tensor(obs).unsqueeze(1).to(device))
             actions = actions.detach().cpu().numpy()
 
         # TRY NOT TO MODIFY: execute the game and log data.
         next_obs, rewards, terminations, truncations, infos = envs.step(actions)
-
+        
         # TRY NOT TO MODIFY: record rewards for plotting purposes
         if "final_info" in infos:
             for info in infos["final_info"]:
@@ -198,7 +217,8 @@ if __name__ == "__main__":
         for idx, trunc in enumerate(truncations):
             if trunc:
                 real_next_obs[idx] = infos["final_observation"][idx]
-        rb.add(obs, real_next_obs, actions, rewards, terminations, infos)
+        
+        rb.add(obs, real_next_obs, actions, rewards, terminations, truncations, infos)
 
         # TRY NOT TO MODIFY: CRUCIAL step easy to overlook
         obs = next_obs
@@ -211,7 +231,7 @@ if __name__ == "__main__":
                 qf1_next_target, qf2_next_target = target_agent.forward_critic(data.next_observations, next_state_actions)
                 min_qf_next_target = torch.min(qf1_next_target, qf2_next_target) - alpha * next_state_log_pi
                 next_q_value = data.rewards.flatten() + (1 - data.dones.flatten()) * args.gamma * (min_qf_next_target).view(-1)
-
+            
             qf1_a_values, qf2_a_values = agent.forward_critic(data.observations, data.actions)
             qf1_a_values, qf2_a_values = qf1_a_values.view(-1), qf2_a_values.view(-1)
             qf1_loss = F.mse_loss(qf1_a_values, next_q_value)
@@ -221,6 +241,7 @@ if __name__ == "__main__":
             # optimize the model
             q_optimizer.zero_grad()
             qf_loss.backward()
+            torch.nn.utils.clip_grad_norm_(q_optimizer.param_groups[0]['params'], args.clip_norm)
             q_optimizer.step()
 
             if global_step % args.policy_frequency == 0:  # TD 3 Delayed update support
@@ -234,6 +255,7 @@ if __name__ == "__main__":
 
                     actor_optimizer.zero_grad()
                     actor_loss.backward()
+                    torch.nn.utils.clip_grad_norm_(actor_optimizer.param_groups[0]['params'], args.clip_norm)
                     actor_optimizer.step()
 
                     if args.autotune:
@@ -243,6 +265,7 @@ if __name__ == "__main__":
 
                         a_optimizer.zero_grad()
                         alpha_loss.backward()
+                        torch.nn.utils.clip_grad_norm_(a_optimizer.param_groups[0]['params'], args.clip_norm)
                         a_optimizer.step()
                         alpha = log_alpha.exp().item()
 
