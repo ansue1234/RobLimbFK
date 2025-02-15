@@ -217,8 +217,13 @@ if __name__ == "__main__":
         for idx, trunc in enumerate(truncations):
             if trunc:
                 real_next_obs[idx] = infos["final_observation"][idx]
-        
-        rb.add(obs, real_next_obs, actions, rewards, terminations, truncations, infos)
+                
+        # if out of memory, pop the first element
+        try:
+            rb.add(obs, real_next_obs, actions, rewards, terminations, truncations, infos)
+        except:
+            rb.pop()
+            rb.add(obs, real_next_obs, actions, rewards, terminations, truncations, infos)
 
         # TRY NOT TO MODIFY: CRUCIAL step easy to overlook
         obs = next_obs
@@ -237,13 +242,12 @@ if __name__ == "__main__":
             qf1_loss = F.mse_loss(qf1_a_values, next_q_value)
             qf2_loss = F.mse_loss(qf2_a_values, next_q_value)
             qf_loss = qf1_loss + qf2_loss
-
             # optimize the model
             q_optimizer.zero_grad()
             qf_loss.backward()
             torch.nn.utils.clip_grad_norm_(q_optimizer.param_groups[0]['params'], args.clip_norm)
             q_optimizer.step()
-
+            
             if global_step % args.policy_frequency == 0:  # TD 3 Delayed update support
                 for _ in range(
                     args.policy_frequency
@@ -252,17 +256,14 @@ if __name__ == "__main__":
                     qf1_pi, qf2_pi = agent.forward_critic(data.observations, pi)
                     min_qf_pi = torch.min(qf1_pi, qf2_pi)
                     actor_loss = ((alpha * log_pi) - min_qf_pi).mean()
-
                     actor_optimizer.zero_grad()
                     actor_loss.backward()
                     torch.nn.utils.clip_grad_norm_(actor_optimizer.param_groups[0]['params'], args.clip_norm)
                     actor_optimizer.step()
-
                     if args.autotune:
                         with torch.no_grad():
                             _, log_pi, _ = agent.get_action(data.observations)
                         alpha_loss = (-log_alpha.exp() * (log_pi + target_entropy)).mean()
-
                         a_optimizer.zero_grad()
                         alpha_loss.backward()
                         torch.nn.utils.clip_grad_norm_(a_optimizer.param_groups[0]['params'], args.clip_norm)

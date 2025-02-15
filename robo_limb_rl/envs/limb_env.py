@@ -267,13 +267,13 @@ class LimbEnv(gym.Env):
             self.power_neg_y = self.power_neg_y*(1 - self.cooling_constant*self.dt)
             # Simulate heating
             if action[0] > 0:
-                self.power_pos_x += np.abs(action[0])**2
+                self.power_pos_x += (np.abs(action[0])**2/3)*self.dt
             else:
-                self.power_neg_x += np.abs(action[0])**2
+                self.power_neg_x += (np.abs(action[0])**2/3)*self.dt
             if action[1] > 0:
-                self.power_pos_y += np.abs(action[1])**2
+                self.power_pos_y += (np.abs(action[1])**2/3)*self.dt
             else:
-                self.power_neg_y += np.abs(action[1])**2
+                self.power_neg_y += (np.abs(action[1])**2/3)*self.dt
         
         #termination condition
         done = self.check_termination()

@@ -3,6 +3,7 @@ import torch
 import numpy as np
 import torch.nn.functional as F
 from robo_limb_ml.models.fk_seq2seq import FK_SEQ2SEQ
+from robo_limb_rl.utils.utils import get_last_items, last_items
 
 class Seq2SeqEncoderOnly(nn.Module):
     def __init__(self, input_dim, hidden_dim, num_layers, batch_size, pretrained_model=None, device='cpu'):
@@ -35,7 +36,7 @@ class Seq2SeqEncoderOnly(nn.Module):
         x = x.to(self.device)
         # Forward pass through the encoder
         out, hidden = self.encoder(x, hidden)
-        out = out[:, -1, :]
+        out = get_last_items(out)
         return out, hidden
 
 class Seq2SeqFullHead(nn.Module):
@@ -71,10 +72,10 @@ class Seq2SeqFullHead(nn.Module):
     def forward(self, x, hidden):
         # print("main forward", x.shape)
         encoder_out, encoder_hidden = self.encoder(x, hidden)
-        decoder_input = x[:, -1:, :]
+        decoder_input = get_last_items(x)
         decoder_hidden = encoder_hidden
         decoder_out, decoder_hidden = self.decoder(decoder_input, decoder_hidden, encoder_out)
-        decoder_out = decoder_out[:, -1, :]
+        decoder_out = get_last_items(decoder_out)
         return decoder_out, encoder_hidden
 
 
@@ -215,8 +216,14 @@ class RLAgent(nn.Module):
 
     def _get_features(self, x):
         # No context because each batch contains whole trajectory
-        hidden = (torch.zeros(self.num_layers, x.shape[0], self.hidden_dim).to(self.device),
-                  torch.zeros(self.num_layers, x.shape[0], self.hidden_dim).to(self.device))
+        # dealing with padded sequence
+        if type(x) is not torch.Tensor:
+            batch_size = x[0].shape[0]
+        else:
+            batch_size = x.shape[0]
+        
+        hidden = (torch.zeros(self.num_layers, batch_size, self.hidden_dim).to(self.device),
+                  torch.zeros(self.num_layers, batch_size, self.hidden_dim).to(self.device))
         if self.freeze_head:
             with torch.no_grad():
                 return self.head(x, hidden)
@@ -229,12 +236,19 @@ class RLAgent(nn.Module):
         # if not isinstance(x, torch.Tensor):
         #     x = torch.FloatTensor(x).to(self.device)
         # Add necessary dimensions for sequential heads
-        obs = x[:,:,:self.state_dim]
-        power_goal = x[:,-1, self.state_dim:]
+        
+        # Breaking into obs and power_goal
+        if type(x) == tuple:
+            obs, power_goal = x[0], x[1]
+            power_goal = last_items(power_goal, unsort=True)
+        else:
+            obs = x[:,:,:self.state_dim]
+            power_goal = x[:,-1, self.state_dim:]
 
         # Get features and update hidden state
         features, _ = self._get_features(obs)
-
+        features = features.squeeze(1)
+        
         features = torch.cat((features, power_goal), dim=1)
         # Get action from actor
         action, log_prob, mean = self.actor.get_action(features)
@@ -242,9 +256,17 @@ class RLAgent(nn.Module):
 
     def forward_critic(self, x, a):
         # Process state through the shared head
-        obs = x[:,:,:self.state_dim]
-        power_goal = x[:,-1,self.state_dim:]
+        if type(x) == tuple:
+            obs, power_goal = x[0], x[1]
+            power_goal = last_items(power_goal, unsort=True)
+        else:
+            obs = x[:,:,:self.state_dim]
+            power_goal = x[:,-1,self.state_dim:]
+            
         features, _ = self._get_features(obs)
+        features = features.squeeze(1)
+        # unpacking power goal
+        
         
         features = torch.cat((features, power_goal), dim=1)
         # Forward through critics
