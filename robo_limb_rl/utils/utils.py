@@ -87,166 +87,124 @@ class TrajData():
         self.actions = action
         self.rewards = reward
         self.dones = done
-
+# only for single environment 1d vector for observations
 class TrajReplayBuffer():
-    def __init__(self, max_size, device):
+    def __init__(self, 
+                 max_size, 
+                 original_obs_space_size,
+                 new_obs_space_size,
+                 action_space_size,
+                 device, 
+                 min_seq_len=50,
+                 max_seq_len=500):
         self.max_size = max_size
         self.device = device
-        self.size = 0
-        self.trajs_orig_obs = []
-        self.trajs_new_obs = []
-        self.trajs_next_states_orig_obs = []
-        self.trajs_next_states_new_obs = []
-        self.trajs_actions = []
-        self.trajs_rewards = []
-        self.trajs_dones = []
-        self.trajs_lengths = [0]
-        self.trajs_info = []
-        
-        self.current_traj_orig_obs = []
-        self.current_traj_new_obs = []
-        self.current_traj_next_states_orig_obs = []
-        self.current_traj_next_states_new_obs = []
-        self.current_traj_actions = []
-        self.current_traj_rewards = []
-        self.current_traj_dones = []
-        self.current_traj_info = []
-    
+        self.size = 0  # number of finished trajectories stored
+
+        # Pointer for where to write the next finished trajectory.
+        self.buffer_pointer = 0
+        # Pointer for the current step within the ongoing trajectory.
+        self.traj_pos_pointer = 0
+
+        self.max_seq_len = max_seq_len
+        self.min_seq_len = min_seq_len
+
+        # Pre-allocated buffers for full trajectories.
+        self.trajs_orig_obs = torch.zeros((max_size, max_seq_len, original_obs_space_size),
+                                          dtype=torch.float32, device=device)
+        self.trajs_new_obs = torch.zeros((max_size, max_seq_len, new_obs_space_size),
+                                         dtype=torch.float32, device=device)
+        self.trajs_next_states_orig_obs = torch.zeros((max_size, max_seq_len, original_obs_space_size),
+                                                      dtype=torch.float32, device=device)
+        self.trajs_next_states_new_obs = torch.zeros((max_size, max_seq_len, new_obs_space_size),
+                                                     dtype=torch.float32, device=device)
+        self.trajs_actions = torch.zeros((max_size, max_seq_len, action_space_size),
+                                         dtype=torch.float32, device=device)
+        self.trajs_rewards = torch.zeros((max_size, max_seq_len),
+                                         dtype=torch.float32, device=device)
+        self.trajs_dones = torch.zeros((max_size, max_seq_len),
+                                       dtype=torch.float32, device=device)
+        # This tensor stores the actual trajectory length for each stored trajectory.
+        self.trajs_lengths = torch.zeros((max_size,), dtype=torch.int32, device=device)
+
     def add(self, state, next_state, action, reward, done, truncated, infos):
-        # Do splicing here
+        """
+        Writes the incoming step directly into the appropriate row and column of the replay buffer.
+        When a terminal (or truncated) signal is received or when max_seq_len is reached,
+        the current trajectory is considered finished.
+        """
+        # For a single environment, extract the first element.
         state = state[0]
         next_state = next_state[0]
-        
+
+        # Split the observation into its “original” and “new” parts.
         state_orig_obs = state[:6]
         state_new_obs = state[6:]
         next_state_orig_obs = next_state[:6]
         next_state_new_obs = next_state[6:]
-        
+
         action = action[0]
         reward = reward[0]
         done = done[0]
         truncated = truncated[0]
-        
-        self.current_traj_orig_obs.append(state_orig_obs)
-        self.current_traj_new_obs.append(state_new_obs)
-        self.current_traj_next_states_orig_obs.append(next_state_orig_obs)
-        self.current_traj_next_states_new_obs.append(next_state_new_obs)
-        self.current_traj_actions.append(action)
-        self.current_traj_rewards.append(reward)
-        self.current_traj_dones.append(done)
-        self.trajs_lengths[-1] += 1
-        
-        if done or truncated:
-            
-            self.trajs_orig_obs.append(torch.Tensor(np.array(self.current_traj_orig_obs)))
-            self.trajs_new_obs.append(torch.Tensor(np.array(self.current_traj_new_obs)))
-            self.trajs_next_states_orig_obs.append(torch.Tensor(np.array(self.current_traj_next_states_orig_obs)))
-            self.trajs_next_states_new_obs.append(torch.Tensor(np.array(self.current_traj_next_states_new_obs)))
-            self.trajs_actions.append(torch.Tensor(np.array(self.current_traj_actions)))
-            self.trajs_rewards.append(torch.Tensor(self.current_traj_rewards))
-            self.trajs_dones.append(torch.Tensor(self.current_traj_dones))
-            
-            
-            self.current_traj_orig_obs = []
-            self.current_traj_new_obs = []
-            self.current_traj_next_states_orig_obs = []
-            self.current_traj_next_states_new_obs = []
-            self.current_traj_actions = []
-            self.current_traj_rewards = []
-            self.current_traj_dones = []
-            self.trajs_lengths.append(0)
-            
+
+        pos = self.traj_pos_pointer  # current step index in trajectory
+        bp = self.buffer_pointer     # current trajectory index in buffer
+
+        # Write the data directly into the main buffers.
+        self.trajs_orig_obs[bp, pos] = torch.tensor(state_orig_obs, dtype=torch.float32, device=self.device)
+        self.trajs_new_obs[bp, pos] = torch.tensor(state_new_obs, dtype=torch.float32, device=self.device)
+        self.trajs_next_states_orig_obs[bp, pos] = torch.tensor(next_state_orig_obs, dtype=torch.float32, device=self.device)
+        self.trajs_next_states_new_obs[bp, pos] = torch.tensor(next_state_new_obs, dtype=torch.float32, device=self.device)
+        self.trajs_actions[bp, pos] = torch.tensor(action, dtype=torch.float32, device=self.device)
+        self.trajs_rewards[bp, pos] = torch.tensor(reward, dtype=torch.float32, device=self.device)
+        self.trajs_dones[bp, pos] = torch.tensor(done, dtype=torch.float32, device=self.device)
+
+        self.traj_pos_pointer += 1
+
+        # If the trajectory has ended (or reached the maximum sequence length), mark it as finished.
+        if done or truncated or self.traj_pos_pointer >= self.max_seq_len:
+            length = self.traj_pos_pointer  # recorded trajectory length
+            self.trajs_lengths[bp] = length
+
+            # Update buffer pointer in a circular fashion.
+            self.buffer_pointer = (self.buffer_pointer + 1) % self.max_size
             if self.size < self.max_size:
                 self.size += 1
-            else:
-                self.size = self.max_size
-                self.trajs_orig_obs.pop(0)
-                self.trajs_new_obs.pop(0)
-                self.trajs_next_states_orig_obs.pop(0)
-                self.trajs_next_states_new_obs.pop(0)
-                self.trajs_actions.pop(0)
-                self.trajs_rewards.pop(0)
-                self.trajs_dones.pop(0)
-                self.trajs_lengths.pop(0)
-                
-    def pop(self):
-        self.trajs_orig_obs.pop(0)
-        self.trajs_new_obs.pop(0)
-        self.trajs_next_states_orig_obs.pop(0)
-        self.trajs_next_states_new_obs.pop(0)
-        self.trajs_actions.pop(0)
-        self.trajs_rewards.pop(0)
-        self.trajs_dones.pop(0)
-        if len(self.trajs_lengths) > 1:
-            self.trajs_lengths.pop(0)
-            self.size -= 1
-        else:
-            self.size = 0
+
+            # Reset the step pointer for the new trajectory.
+            self.traj_pos_pointer = 0
     
     def sample(self, batch_size=1):
-        first_traj = False
-        if self.size < 1:
-            first_traj = True
-            self.size = 1
-            self.trajs_orig_obs.append(torch.Tensor(self.current_traj_orig_obs))
-            self.trajs_new_obs.append(torch.Tensor(self.current_traj_new_obs))
-            self.trajs_next_states_orig_obs.append(torch.Tensor(self.current_traj_next_states_orig_obs))
-            self.trajs_next_states_new_obs.append(torch.Tensor(self.current_traj_next_states_new_obs))
-            self.trajs_actions.append(torch.Tensor(self.current_traj_actions))
-            self.trajs_rewards.append(torch.Tensor(self.current_traj_rewards))
-            self.trajs_dones.append(torch.Tensor(self.current_traj_dones))
-        # if self.size < batch_size:
-        #     trajs = self.trajs
-        #     trajs_next_states = self.trajs_next_states
-        #     trajs_actions = self.trajs_actions
-        #     trajs_rewards = self.trajs_rewards
-        #     trajs_dones = self.trajs_dones
-        #     trajs_lengths = self.trajs_lengths[:-1]
-        # else:
-        traj_indices = np.random.randint(0, self.size, size=batch_size)
-        trajs_orig_obs = np.array(self.trajs_orig_obs, dtype=object)[traj_indices]
-        trajs_new_obs = np.array(self.trajs_new_obs, dtype=object)[traj_indices]
-        trajs_next_states_orig_obs = np.array(self.trajs_next_states_orig_obs, dtype=object)[traj_indices]
-        trajs_next_states_new_obs = np.array(self.trajs_next_states_new_obs, dtype=object)[traj_indices]
-        trajs_actions = np.array(self.trajs_actions, dtype=object)[traj_indices]
-        trajs_rewards = np.array(self.trajs_rewards, dtype=object)[traj_indices]
-        trajs_dones = np.array(self.trajs_dones, dtype=object)[traj_indices]
-        trajs_lengths = np.array(self.trajs_lengths)[traj_indices]
+        """
+        Samples a batch of trajectories from the replay buffer.
+        """
+        sampled_indices = np.random.choice(self.size, batch_size, replace=True)
+        trajs_lengths = self.trajs_lengths[sampled_indices]
         
-        if type(trajs_orig_obs[0]) == np.ndarray:
-            trajs_orig_obs = torch.Tensor(trajs_orig_obs.astype(np.float32)).type(torch.float)
-            trajs_new_obs = torch.Tensor(trajs_new_obs.astype(np.float32)).type(torch.float)
-            trajs_next_states_new_obs = torch.Tensor(trajs_next_states_new_obs.astype(np.float32)).type(torch.float)
-            trajs_next_states_orig_obs = torch.Tensor(trajs_next_states_orig_obs.astype(np.float32)).type(torch.float)
-            trajs_actions = torch.Tensor(trajs_actions.astype(np.float32)).type(torch.float)
-            trajs_rewards = torch.Tensor(trajs_rewards.astype(np.float32)).type(torch.float)
-            trajs_dones = torch.Tensor(trajs_dones.astype(np.float32)).type(torch.float)
-            
-        # Padding values
-        max_length = min(np.max(trajs_lengths), 400)
-        min_length = min(np.min(trajs_lengths), max_length)
+        max_length = int(trajs_lengths.max().item())
+        min_length = int(trajs_lengths.min().item())
         
-        if min_length == max_length:
-            index_to_clip = min_length
-        else:
-            index_to_clip = np.random.randint(min_length, max_length) 
+        index_to_clip_end = np.random.randint(min_length, max_length) if min_length < max_length else np.random.randint(self.min_seq_len, max_length)
+        index_to_clip_head = np.random.randint(0, index_to_clip_end - self.min_seq_len) if index_to_clip_end - self.min_seq_len > min_length else 0
         
-        clipped_trajs_length = np.clip(trajs_lengths, 0, index_to_clip)
-        last_step_ind = clipped_trajs_length - 1
-
-        padded_trajs_orig_obs = torch.nn.utils.rnn.pad_sequence(trajs_orig_obs, batch_first=True, padding_side='right')
-        padded_trajs_new_obs = torch.nn.utils.rnn.pad_sequence(trajs_new_obs, batch_first=True, padding_side='right')
-        padded_trajs_next_states_orig_obs = torch.nn.utils.rnn.pad_sequence(trajs_next_states_orig_obs, batch_first=True, padding_side='right')
-        padded_trajs_next_states_new_obs = torch.nn.utils.rnn.pad_sequence(trajs_next_states_new_obs, batch_first=True, padding_side='right')
+        padded_trajs_orig_obs = self.trajs_orig_obs[sampled_indices][:, index_to_clip_head:index_to_clip_end]
+        padded_trajs_new_obs = self.trajs_new_obs[sampled_indices][:, index_to_clip_head:index_to_clip_end]
+        padded_trajs_next_states_orig_obs = self.trajs_next_states_orig_obs[sampled_indices][:, index_to_clip_head:index_to_clip_end]
+        padded_trajs_next_states_new_obs = self.trajs_next_states_new_obs[sampled_indices][:, index_to_clip_head:index_to_clip_end]
+        padded_trajs_actions = self.trajs_actions[sampled_indices][:, index_to_clip_head:index_to_clip_end]
+        padded_trajs_rewards = self.trajs_rewards[sampled_indices][:, index_to_clip_head:index_to_clip_end]
+        padded_trajs_dones = self.trajs_dones[sampled_indices][:, index_to_clip_head:index_to_clip_end]
+        
+        
+        clipped_trajs_length = torch.clamp(trajs_lengths, max=index_to_clip_end) - index_to_clip_head
+        
+        last_step_ind = (clipped_trajs_length - 1).to(dtype=torch.int64)
         
         tensor_trajs_orig_obs = torch.nn.utils.rnn.pack_padded_sequence(padded_trajs_orig_obs, lengths=clipped_trajs_length, batch_first=True, enforce_sorted=False).to(self.device)
         tensor_trajs_new_obs = torch.nn.utils.rnn.pack_padded_sequence(padded_trajs_new_obs, lengths=clipped_trajs_length, batch_first=True, enforce_sorted=False).to(self.device)
         tensor_trajs_next_states_orig_obs = torch.nn.utils.rnn.pack_padded_sequence(padded_trajs_next_states_orig_obs, lengths=clipped_trajs_length, batch_first=True, enforce_sorted=False).to(self.device)
         tensor_trajs_next_states_new_obs = torch.nn.utils.rnn.pack_padded_sequence(padded_trajs_next_states_new_obs, lengths=clipped_trajs_length, batch_first=True, enforce_sorted=False).to(self.device)
-        
-        padded_trajs_actions = torch.nn.utils.rnn.pad_sequence(trajs_actions, batch_first=True, padding_side='right')
-        padded_trajs_rewards = torch.nn.utils.rnn.pad_sequence(trajs_rewards, batch_first=True, padding_side='right')
-        padded_trajs_dones = torch.nn.utils.rnn.pad_sequence(trajs_dones, batch_first=True, padding_side='right', )
         
         # print(torch.tensor(last_step_ind).unsqueeze(-1).expand(-1, padded_trajs_actions.shape[-1]).unsqueeze(1).shape)
         tensor_trajs_actions = torch.gather(padded_trajs_actions, dim=1, index=torch.tensor(last_step_ind).unsqueeze(-1).expand(-1, padded_trajs_actions.shape[-1]).unsqueeze(1)).squeeze(1).to(self.device)
@@ -257,9 +215,6 @@ class TrajReplayBuffer():
         tensor_trajs_actions = tensor_trajs_actions.type(torch.float)
         tensor_trajs_dones = tensor_trajs_dones.type(torch.float)
         
-        # handle first traj
-        if first_traj:
-            self.pop()
         # return TrajData(tensor_trajs, tensor_trajs_next_states, tensor_trajs_actions, tensor_trajs_rewards, tensor_trajs_dones)
         return TrajData(tensor_trajs_orig_obs, 
                         tensor_trajs_new_obs, 

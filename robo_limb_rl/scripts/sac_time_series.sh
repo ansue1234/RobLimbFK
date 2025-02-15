@@ -1,14 +1,14 @@
 python sac_cont_action.py \
-       --exp-name "sac_time_series_600k_seq2seq_enc_no_pretrain_no_freeze" \
+       --exp-name "sac_time_series_test_seq2seq_enc_no_pretrain_no_freeze" \
        --seed 1 \
        --wandb-project_name "soft_limb_rl" \
        --wandb-entity "gsue" \
        --env-id "LimbEnv-v0" \
-       --total-timesteps 600000 \
+       --total-timesteps 20 \
        --buffer_size 100000 \
-       --batch_size 256 \
-       --learning_starts 10000 \
+       --batch_size 2 \
+       --learning_starts 2 \
        --config_path "./yaml/no_dom/limb_env_power_vel.yml" \
        --head_type "seq2seq_encoder" \
-       --no-freeze_head \
+       --freeze_head \
        --no-pretrained_model

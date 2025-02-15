@@ -186,7 +186,11 @@ if __name__ == "__main__":
             )
     else:
         rb = TrajReplayBuffer(max_size=args.buffer_size,
-                            device=device)
+                              original_obs_space_size=6,
+                              new_obs_space_size=np.prod(envs.single_observation_space.shape) - 6,
+                              action_space_size=np.prod(envs.single_action_space.shape),
+                              max_seq_len=500,
+                              device=device)
     
 
     start_time = time.time()
@@ -219,11 +223,7 @@ if __name__ == "__main__":
                 real_next_obs[idx] = infos["final_observation"][idx]
                 
         # if out of memory, pop the first element
-        try:
-            rb.add(obs, real_next_obs, actions, rewards, terminations, truncations, infos)
-        except:
-            rb.pop()
-            rb.add(obs, real_next_obs, actions, rewards, terminations, truncations, infos)
+        rb.add(obs, real_next_obs, actions, rewards, terminations, truncations, infos)
 
         # TRY NOT TO MODIFY: CRUCIAL step easy to overlook
         obs = next_obs
