@@ -352,7 +352,12 @@ class LimbEnv(gym.Env):
         reward_components = {}
         reward_components['reach_rew'] = - self.reach_pen_weight*(np.linalg.norm(state[:2] - goal[:2]) + np.sum(action**2))
         if self.include_velocity:
-            reward_components['vel_rew'] = - self.vel_pen_weight*np.sqrt((np.linalg.norm(state[2:4])*np.linalg.norm(goal[2:4]) - np.dot(state[2:4], goal[2:4])))
+            if np.linalg.norm(state[2:4])*np.linalg.norm(goal[2:4]) - np.dot(state[2:4], goal[2:4]) < 0:
+                print("state vel:", state[2:4])
+                print("goal vel:", goal[2:4])
+                print("dot product:", np.dot(state[2:4], goal[2:4]))
+                print("vel product:", np.linalg.norm(state[2:4])*np.linalg.norm(goal[2:4]))
+            reward_components['vel_rew'] = -self.vel_pen_weight*(np.sqrt(np.round(np.linalg.norm(state[2:4])*np.linalg.norm(goal[2:4]) - np.dot(state[2:4], goal[2:4]), 2)))
         if self.check_termination():
             reward_components['path_rew'] = - self.path_pen_weight*(self.traveled_length - np.linalg.norm(state[:2] - goal[:2]) + 1)
         return sum(reward_components.values()), reward_components

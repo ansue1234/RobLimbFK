@@ -142,7 +142,7 @@ class TrajReplayBuffer():
             self.trajs_new_obs.append(torch.Tensor(np.array(self.current_traj_new_obs)))
             self.trajs_next_states_orig_obs.append(torch.Tensor(np.array(self.current_traj_next_states_orig_obs)))
             self.trajs_next_states_new_obs.append(torch.Tensor(np.array(self.current_traj_next_states_new_obs)))
-            self.trajs_actions.append(torch.Tensor(self.current_traj_actions))
+            self.trajs_actions.append(torch.Tensor(np.array(self.current_traj_actions)))
             self.trajs_rewards.append(torch.Tensor(self.current_traj_rewards))
             self.trajs_dones.append(torch.Tensor(self.current_traj_dones))
             
@@ -223,8 +223,9 @@ class TrajReplayBuffer():
             trajs_dones = torch.Tensor(trajs_dones.astype(np.float32)).type(torch.float)
             
         # Padding values
-        min_length = np.min(trajs_lengths)
         max_length = min(np.max(trajs_lengths), 400)
+        min_length = min(np.min(trajs_lengths), max_length)
+        
         if min_length == max_length:
             index_to_clip = min_length
         else:
@@ -278,9 +279,9 @@ def sorted_lengths(pack: PackedSequence) -> Tuple[torch.Tensor, torch.Tensor]:
     indices = torch.arange(
         pack.batch_sizes[0],
         dtype=pack.batch_sizes.dtype,
-        device=pack.batch_sizes.device,
+        device=pack.data.device,
     )
-    lengths = ((indices + 1)[:, None] <= pack.batch_sizes[None, :]).long().sum(dim=1)
+    lengths = ((indices + 1)[:, None] <= pack.batch_sizes[None, :].to(device=pack.data.device)).long().sum(dim=1)
     return lengths, indices
 
 
@@ -289,7 +290,7 @@ def sorted_first_indices(pack: PackedSequence) -> torch.Tensor:
     return torch.arange(
         pack.batch_sizes[0],
         dtype=pack.batch_sizes.dtype,
-        device=pack.batch_sizes.device,
+        device=pack.data.device,
     )
 
 
@@ -299,7 +300,7 @@ def sorted_last_indices(pack: PackedSequence) -> torch.Tensor:
     cum_batch_sizes = torch.cat([
         pack.batch_sizes.new_zeros((2,)),
         torch.cumsum(pack.batch_sizes, dim=0),
-    ], dim=0)
+    ], dim=0).to(device=pack.data.device)
     return cum_batch_sizes[lengths] + indices
 
 
