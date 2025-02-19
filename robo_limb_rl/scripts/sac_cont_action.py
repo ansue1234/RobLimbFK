@@ -3,6 +3,9 @@ import os
 import random
 import time
 from dataclasses import dataclass
+from contextlib import contextmanager
+
+
 
 import gymnasium as gym
 import numpy as np
@@ -86,6 +89,13 @@ def make_env(env_id, seed, idx, capture_video, run_name, config_path):
         return env
     return thunk
 
+@contextmanager
+def timing_context(name):
+    start_time = time.time()
+    yield
+    end_time = time.time()
+    print(f"{name} took {end_time - start_time:.2f} seconds")
+
 
 if __name__ == "__main__":
     args = tyro.cli(Args)
@@ -152,6 +162,8 @@ if __name__ == "__main__":
                     pretrained_model=pretrained_model_path,
                     device=device).to(device)
     
+    print("Total number of parameters:", sum([param.nelement() for param in agent.parameters()]))
+    
     target_agent.load_state_dict(agent.state_dict())
     if args.freeze_head:
         for param in agent.head.parameters():
@@ -189,7 +201,7 @@ if __name__ == "__main__":
                               original_obs_space_size=6,
                               new_obs_space_size=np.prod(envs.single_observation_space.shape) - 6,
                               action_space_size=np.prod(envs.single_action_space.shape),
-                              max_seq_len=500,
+                              max_seq_len=200,
                               device=device)
     
 
@@ -214,6 +226,8 @@ if __name__ == "__main__":
                 # print(f"global_step={global_step}, episodic_return={info['episode']['r']}")
                 writer.add_scalar("charts/episodic_return", info["episode"]["r"], global_step)
                 writer.add_scalar("charts/episodic_length", info["episode"]["l"], global_step)
+                if 'path_rew' in info:
+                    writer.add_scalar("rewards/path_rew", info["path_rew"], global_step)
                 break
 
         # TRY NOT TO MODIFY: save data to reply buffer; handle `final_observation`
@@ -231,6 +245,7 @@ if __name__ == "__main__":
         # ALGO LOGIC: training.
         if global_step > args.learning_starts:
             data = rb.sample(args.batch_size)
+            
             with torch.no_grad():
                 next_state_actions, next_state_log_pi, _ = agent.get_action(data.next_observations)
                 qf1_next_target, qf2_next_target = target_agent.forward_critic(data.next_observations, next_state_actions)
@@ -242,7 +257,8 @@ if __name__ == "__main__":
             qf1_loss = F.mse_loss(qf1_a_values, next_q_value)
             qf2_loss = F.mse_loss(qf2_a_values, next_q_value)
             qf_loss = qf1_loss + qf2_loss
-            # optimize the model
+                # optimize the model
+            
             q_optimizer.zero_grad()
             qf_loss.backward()
             torch.nn.utils.clip_grad_norm_(q_optimizer.param_groups[0]['params'], args.clip_norm)
@@ -256,6 +272,7 @@ if __name__ == "__main__":
                     qf1_pi, qf2_pi = agent.forward_critic(data.observations, pi)
                     min_qf_pi = torch.min(qf1_pi, qf2_pi)
                     actor_loss = ((alpha * log_pi) - min_qf_pi).mean()
+                    
                     actor_optimizer.zero_grad()
                     actor_loss.backward()
                     torch.nn.utils.clip_grad_norm_(actor_optimizer.param_groups[0]['params'], args.clip_norm)
@@ -289,6 +306,9 @@ if __name__ == "__main__":
                 writer.add_scalar("losses/alpha", alpha, global_step)
                 # print("SPS:", int(global_step / (time.time() - start_time)))
                 writer.add_scalar("charts/SPS", int(global_step / (time.time() - start_time)), global_step)
+                if 'reach_rew' in infos and 'vel_rew' in infos:
+                    writer.add_scalar("rewards/reach_rew", infos["reach_rew"][0], global_step)
+                    writer.add_scalar("rewards/vel_rew", infos["vel_rew"][0], global_step)
                 if args.autotune:
                     writer.add_scalar("losses/alpha_loss", alpha_loss.item(), global_step)
                     

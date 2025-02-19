@@ -96,11 +96,14 @@ class TrajReplayBuffer():
                  action_space_size,
                  device, 
                  min_seq_len=50,
-                 max_seq_len=500):
+                 max_seq_len=200):
         self.max_size = max_size
         self.device = device
         self.size = 0  # number of finished trajectories stored
-
+        self.original_obs_space_size = original_obs_space_size
+        self.new_obs_space_size = new_obs_space_size
+        self.action_space_size = action_space_size
+        
         # Pointer for where to write the next finished trajectory.
         self.buffer_pointer = 0
         # Pointer for the current step within the ongoing trajectory.
@@ -169,6 +172,15 @@ class TrajReplayBuffer():
 
             # Update buffer pointer in a circular fashion.
             self.buffer_pointer = (self.buffer_pointer + 1) % self.max_size
+            # Set entry at buffer_pointer in buffer to zeros
+            self.trajs_orig_obs[self.buffer_pointer] = torch.zeros((self.max_seq_len, self.original_obs_space_size), dtype=torch.float32, device=self.device)
+            self.trajs_new_obs[self.buffer_pointer] = torch.zeros((self.max_seq_len, self.new_obs_space_size), dtype=torch.float32, device=self.device)
+            self.trajs_next_states_orig_obs[self.buffer_pointer] = torch.zeros((self.max_seq_len, self.original_obs_space_size), dtype=torch.float32, device=self.device)
+            self.trajs_next_states_new_obs[self.buffer_pointer] = torch.zeros((self.max_seq_len, self.new_obs_space_size), dtype=torch.float32, device=self.device)
+            self.trajs_actions[self.buffer_pointer] = torch.zeros((self.max_seq_len, self.action_space_size), dtype=torch.float32, device=self.device)
+            self.trajs_rewards[self.buffer_pointer] = torch.zeros((self.max_seq_len), dtype=torch.float32, device=self.device)
+            self.trajs_dones[self.buffer_pointer] = torch.zeros((self.max_seq_len), dtype=torch.float32, device=self.device)
+            
             if self.size < self.max_size:
                 self.size += 1
 
@@ -185,9 +197,17 @@ class TrajReplayBuffer():
         max_length = int(trajs_lengths.max().item())
         min_length = int(trajs_lengths.min().item())
         
-        index_to_clip_end = np.random.randint(min_length, max_length) if min_length < max_length else np.random.randint(self.min_seq_len, max_length)
-        index_to_clip_head = np.random.randint(0, index_to_clip_end - self.min_seq_len) if index_to_clip_end - self.min_seq_len > min_length else 0
-        
+        if min_length < max_length and max_length > 0:
+            index_to_clip_end = np.random.randint(min_length, max_length)
+        elif max_length > self.min_seq_len:
+            index_to_clip_end = np.random.randint(self.min_seq_len, max_length)
+        else:
+            index_to_clip_end = max_length
+            
+        # index_to_clip_end = np.random.randint(min_length, max_length) if min_length < max_length elif  np.random.randint(self.min_seq_len, max_length)
+        index_to_clip_head = np.random.randint(0, index_to_clip_end - self.min_seq_len) if index_to_clip_end - self.min_seq_len < min_length and index_to_clip_end - self.min_seq_len > 0 else 0
+        # disabling random to help with stable training
+        index_to_clip_head = 0
         padded_trajs_orig_obs = self.trajs_orig_obs[sampled_indices][:, index_to_clip_head:index_to_clip_end]
         padded_trajs_new_obs = self.trajs_new_obs[sampled_indices][:, index_to_clip_head:index_to_clip_end]
         padded_trajs_next_states_orig_obs = self.trajs_next_states_orig_obs[sampled_indices][:, index_to_clip_head:index_to_clip_end]
@@ -196,10 +216,18 @@ class TrajReplayBuffer():
         padded_trajs_rewards = self.trajs_rewards[sampled_indices][:, index_to_clip_head:index_to_clip_end]
         padded_trajs_dones = self.trajs_dones[sampled_indices][:, index_to_clip_head:index_to_clip_end]
         
+        index_to_clip_end = self.max_seq_len
         
         clipped_trajs_length = torch.clamp(trajs_lengths, max=index_to_clip_end) - index_to_clip_head
+        # print("Clipped Trajs Length", clipped_trajs_length)
+        # print("max_length", max_length)
+        # print("min_length", min_length)
+        # print("index_to_clip_end", index_to_clip_end)
+        # print("index_to_clip_head", index_to_clip_head)
+        # print(clipped_trajs_length)
+        clipped_trajs_length = clipped_trajs_length.to(dtype=torch.int32, device='cpu')
         
-        last_step_ind = (clipped_trajs_length - 1).to(dtype=torch.int64)
+        last_step_ind = (clipped_trajs_length - 1).to(dtype=torch.int64, device=self.device)
         
         tensor_trajs_orig_obs = torch.nn.utils.rnn.pack_padded_sequence(padded_trajs_orig_obs, lengths=clipped_trajs_length, batch_first=True, enforce_sorted=False).to(self.device)
         tensor_trajs_new_obs = torch.nn.utils.rnn.pack_padded_sequence(padded_trajs_new_obs, lengths=clipped_trajs_length, batch_first=True, enforce_sorted=False).to(self.device)
@@ -207,9 +235,9 @@ class TrajReplayBuffer():
         tensor_trajs_next_states_new_obs = torch.nn.utils.rnn.pack_padded_sequence(padded_trajs_next_states_new_obs, lengths=clipped_trajs_length, batch_first=True, enforce_sorted=False).to(self.device)
         
         # print(torch.tensor(last_step_ind).unsqueeze(-1).expand(-1, padded_trajs_actions.shape[-1]).unsqueeze(1).shape)
-        tensor_trajs_actions = torch.gather(padded_trajs_actions, dim=1, index=torch.tensor(last_step_ind).unsqueeze(-1).expand(-1, padded_trajs_actions.shape[-1]).unsqueeze(1)).squeeze(1).to(self.device)
-        tensor_trajs_rewards = torch.gather(padded_trajs_rewards, dim=1, index=torch.tensor(last_step_ind).unsqueeze(-1)).to(self.device)
-        tensor_trajs_dones = torch.gather(padded_trajs_dones, dim=1, index=torch.tensor(last_step_ind).unsqueeze(-1)).to(self.device)
+        tensor_trajs_actions = torch.gather(padded_trajs_actions, dim=1, index=last_step_ind.unsqueeze(-1).expand(-1, padded_trajs_actions.shape[-1]).unsqueeze(1)).squeeze(1).to(self.device)
+        tensor_trajs_rewards = torch.gather(padded_trajs_rewards, dim=1, index=last_step_ind.unsqueeze(-1)).to(self.device)
+        tensor_trajs_dones = torch.gather(padded_trajs_dones, dim=1, index=last_step_ind.unsqueeze(-1)).to(self.device)
         
         tensor_trajs_rewards = tensor_trajs_rewards.type(torch.float)
         tensor_trajs_actions = tensor_trajs_actions.type(torch.float)
