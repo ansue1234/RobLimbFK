@@ -13,10 +13,10 @@ dt: 0.075
 theta_limit: 100
 goal_tolerance: 1
 int_actions: True
-full_reset_prob: 0.1
+full_reset_prob: 0.01
 domain_randomization: False
 include_velocity: True
 include_power_calc: True
-reach_pen_weight: 0.01
-vel_pen_weight: 1
+reach_pen_weight: 1
+vel_pen_weight: 0.5
 path_pen_weight: 10

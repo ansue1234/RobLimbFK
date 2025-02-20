@@ -55,9 +55,9 @@ class Args:
     """the batch size of sample from the reply memory"""
     learning_starts: int = 5e3
     """timestep to start learning"""
-    policy_lr: float = 3e-4
+    policy_lr: float = 1e-4
     """the learning rate of the policy network optimizer"""
-    q_lr: float = 1e-3
+    q_lr: float = 1e-4
     """the learning rate of the Q network network optimizer"""
     policy_frequency: int = 2
     """the frequency of training policy (delayed)"""
@@ -140,6 +140,8 @@ if __name__ == "__main__":
     else:
         pretrained_model_path = None
     
+    print("pretrain model", pretrained_model_path)
+    print("freeze head", args.freeze_head)
     # ALGO LOGIC: initialize agent here:
     target_agent = RLAgent(envs.single_observation_space,
                            envs.single_action_space,
@@ -201,7 +203,7 @@ if __name__ == "__main__":
                               original_obs_space_size=6,
                               new_obs_space_size=np.prod(envs.single_observation_space.shape) - 6,
                               action_space_size=np.prod(envs.single_action_space.shape),
-                              max_seq_len=200,
+                              max_seq_len=100,
                               device=device)
     
 
@@ -209,16 +211,29 @@ if __name__ == "__main__":
     os.makedirs(f"../policies/{run_name}", exist_ok=True)
     # TRY NOT TO MODIFY: start the game
     obs, _ = envs.reset(seed=args.seed)
+    # print(obs.shape)
+    terminated = False
+    obs_history = torch.Tensor(obs[0]).to(device).unsqueeze(0)
     for global_step in tqdm(range(args.total_timesteps)):
         # ALGO LOGIC: put action logic here
         if global_step < args.learning_starts:
             actions = np.array([envs.single_action_space.sample() for _ in range(envs.num_envs)])
         else:
-            actions, _, _ = agent.get_action(torch.Tensor(obs).unsqueeze(1).to(device))
+            # with torch.no_grad():
+            actions, _, _ = agent.get_action(torch.Tensor(obs_history).unsqueeze(0).to(device))
             actions = actions.detach().cpu().numpy()
 
         # TRY NOT TO MODIFY: execute the game and log data.
         next_obs, rewards, terminations, truncations, infos = envs.step(actions)
+        if terminated:
+            obs_history = torch.Tensor(next_obs[0]).to(device).unsqueeze(0)
+        terminated = terminations[0]
+        # Update obs history
+        if obs_history.shape[0] < 100:
+            obs_history = torch.vstack((obs_history, torch.Tensor(next_obs[0]).to(device).unsqueeze(0)))
+        else:
+            obs_history = torch.vstack((obs_history[1:], torch.Tensor(next_obs[0]).to(device).unsqueeze(0)))
+
         
         # TRY NOT TO MODIFY: record rewards for plotting purposes
         if "final_info" in infos:
@@ -228,6 +243,8 @@ if __name__ == "__main__":
                 writer.add_scalar("charts/episodic_length", info["episode"]["l"], global_step)
                 if 'path_rew' in info:
                     writer.add_scalar("rewards/path_rew", info["path_rew"], global_step)
+                if 'vel_rew' in info:   
+                    writer.add_scalar("rewards/vel_rew", info["vel_rew"], global_step)
                 break
 
         # TRY NOT TO MODIFY: save data to reply buffer; handle `final_observation`
@@ -237,6 +254,8 @@ if __name__ == "__main__":
                 real_next_obs[idx] = infos["final_observation"][idx]
                 
         # if out of memory, pop the first element
+        if template_env.int_actions:
+            actions = np.round(actions)
         rb.add(obs, real_next_obs, actions, rewards, terminations, truncations, infos)
 
         # TRY NOT TO MODIFY: CRUCIAL step easy to overlook
@@ -245,6 +264,7 @@ if __name__ == "__main__":
         # ALGO LOGIC: training.
         if global_step > args.learning_starts:
             data = rb.sample(args.batch_size)
+            
             
             with torch.no_grad():
                 next_state_actions, next_state_log_pi, _ = agent.get_action(data.next_observations)
@@ -306,16 +326,41 @@ if __name__ == "__main__":
                 writer.add_scalar("losses/alpha", alpha, global_step)
                 # print("SPS:", int(global_step / (time.time() - start_time)))
                 writer.add_scalar("charts/SPS", int(global_step / (time.time() - start_time)), global_step)
-                if 'reach_rew' in infos and 'vel_rew' in infos:
-                    writer.add_scalar("rewards/reach_rew", infos["reach_rew"][0], global_step)
-                    writer.add_scalar("rewards/vel_rew", infos["vel_rew"][0], global_step)
                 if args.autotune:
                     writer.add_scalar("losses/alpha_loss", alpha_loss.item(), global_step)
+        
+        if 'reach_rew' in infos:
+            writer.add_scalar("rewards/reach_rew", infos["reach_rew"][0], global_step)
+        if 'vel_rew' in infos:
+            writer.add_scalar("rewards/vel_rew", infos["vel_rew"][0], global_step)
+            
                     
         if (global_step + 1) % 10000 == 0:
             model_path = f"../policies/{run_name}/agent_{args.exp_name}.cleanrl_model"
             torch.save((agent.state_dict()), model_path)
             print(f"model saved to {model_path}")
+            
+            # Testing goal reach percentage, i.e. test the actor for 100 episodes, see how many times it reaches goal
+            print("...Evaluating agent...")
+            successful_episodes = 0
+            for episode in tqdm(range(100)):
+                eval_obs, _ = template_env.reset()
+                eval_obs_history = torch.Tensor(eval_obs).to(device).unsqueeze(0).unsqueeze(0)
+                # print(eval_obs_history.shape)
+                # print(f"Eval Episode {episode}")
+                for _ in range(250):
+                    with torch.no_grad():
+                        eval_actions, _, _ = agent.get_action(eval_obs_history)
+                        eval_obs, _, termination, _,  _ = template_env.step(eval_actions[0].cpu().numpy())
+                        eval_obs_history = torch.cat((eval_obs_history, torch.Tensor(eval_obs).to(device).unsqueeze(0).unsqueeze(0)), dim=1)
+                        if eval_obs_history.shape[1] > 100:
+                            eval_obs_history = eval_obs_history[:, -100:, :]
+                        if termination:
+                            if template_env.check_termination()[1] == "goal reached":
+                                successful_episodes += 1
+                            break
+            writer.add_scalar("evals/success_rate", successful_episodes/100, global_step)
+                    
     model_path = f"../policies/{run_name}/agent_{args.exp_name}.cleanrl_model"
     torch.save((agent.state_dict()), model_path)
     print(f"model saved to {model_path}")

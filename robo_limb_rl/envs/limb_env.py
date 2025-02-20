@@ -39,7 +39,7 @@ class LimbEnv(gym.Env):
         self.theta_limit = config.get('theta_limit', 100)
         self.goal_tolerance = config.get('goal_tolerance', 1)
         self.int_actions = config.get('int_actions', False)
-        self.full_reset_prob = config.get('full_reset_prob', 0.1)
+        self.full_reset_prob = config.get('full_reset_prob', 0.01)
         self.domain_randomization = config.get('domain_randomization', False)
         self.reach_pen_weight = config.get('reach_pen_weight', 1)
         self.vel_pen_weight = config.get('vel_pen_weight', 1)
@@ -176,18 +176,20 @@ class LimbEnv(gym.Env):
         if self.include_velocity:
             self.goal = np.concatenate((self.goal, self.np_random.uniform(-50, 50, 2,).astype(np.float32)), axis=0)
         # print("Goal:", self.goal)
-        first_data_entry = np.concatenate((self.state, np.array([0.0, 0.0])), dtype=np.float32)
-        self.data = torch.tensor(first_data_entry).to(self.device).unsqueeze(0)
         self.traveled_length = 0
         self.power_pos_x, self.power_pos_y = 0, 0
         self.power_neg_x, self.power_neg_y = 0, 0
         action = np.array([0.0, 0.0])
-        if np.random.rand() < self.full_reset_prob:
-            self.state = self.np_random.uniform(-75, 75, 4).astype(np.float32)
+        reset_threshold = np.random.rand()
+        if reset_threshold < self.full_reset_prob:
+            self.state = np.append(self.np_random.uniform(-75, 75, 2).astype(np.float32), self.np_random.uniform(-10, 10, 2).astype(np.float32))
             self.hidden = (torch.zeros(self.num_layers, 1, self.hidden_dim).to(self.device),
                            torch.zeros(self.num_layers, 1, self.hidden_dim).to(self.device))
-            print("Full Reset")
-
+            print("Full Reset", reset_threshold, self.full_reset_prob)
+            
+        first_data_entry = np.concatenate((self.state, np.array([0.0, 0.0])), dtype=np.float32)
+        self.data = torch.tensor(first_data_entry).to(self.device).unsqueeze(0)
+        
         if self.include_power_calc:
             return np.append(np.append(self.state, 
                                        [action[0], 
@@ -253,7 +255,7 @@ class LimbEnv(gym.Env):
             vel = (self.state[:2] - prev_state[:2]) / self.dt
             self.state[2:] = vel
         # compute reward
-        reward, rew_comp = self.compute_reward(self.state, self.goal, self.goal_tolerance)
+        reward, rew_comp = self.compute_reward(self.state, self.goal, action)
         
         # compute total traveled length
         self.traveled_length += np.linalg.norm(delta_states[:2])
@@ -275,8 +277,9 @@ class LimbEnv(gym.Env):
             else:
                 self.power_neg_y += (np.abs(action[1])**2/3)*self.dt
         
+    
         #termination condition
-        done = self.check_termination()
+        done, _ = self.check_termination()
         
         if self.render_mode == "human":
             self.render()
@@ -351,20 +354,27 @@ class LimbEnv(gym.Env):
         # idea from openai gym's reacher-v2 reward function
         reward_components = {}
         reward_components['reach_rew'] = - self.reach_pen_weight*(np.linalg.norm(state[:2] - goal[:2])**2 + np.sum(action**2))
-        if self.include_velocity:
-            reward_components['vel_rew'] = - self.vel_pen_weight*(np.sqrt(np.round(np.linalg.norm(state[2:4])*np.linalg.norm(goal[2:4]) - np.dot(state[2:4], goal[2:4]), 2)))
-        if np.linalg.norm(state[:2] - goal[:2]) < 1:
-            reward_components['path_rew'] = self.path_pen_weight*(np.linalg.norm(state[:2] - goal[:2])/(self.traveled_length + 1e-6))
+        terminated, reason = self.check_termination()
+        if terminated and reason == "goal reached":
+            reward_components['goal_reward'] = 10000
+            if self.include_velocity:
+                reward_components['vel_rew'] = - self.vel_pen_weight*(np.sqrt(np.round(np.linalg.norm(state[2:4])*np.linalg.norm(goal[2:4]) - np.dot(state[2:4], goal[2:4]), 2)))
+            print("Goal Reached")
+        elif terminated and reason == "out of bounds":
+            reward_components['out_of_bounds'] = -50000
+            print("Out of bounds")
+        # if np.linalg.norm(state[:2] - goal[:2]) < 1:
+        #     reward_components['path_rew'] = self.path_pen_weight*(np.linalg.norm(state[:2] - goal[:2])/(self.traveled_length + 1e-6))
         return sum(reward_components.values()), reward_components
     
     def check_termination(self):
         if self.state[0] > self.theta_limit or self.state[0] < -self.theta_limit or self.state[1] > self.theta_limit or self.state[1] < -self.theta_limit:
-            return True
+            return True, "out of bounds"
         if self.state[2] > self.theta_limit or self.state[2] < -self.theta_limit or self.state[3] > self.theta_limit or self.state[3] < -self.theta_limit:
-            return True
-        if np.linalg.norm(self.state[:2] - self.goal[:2]) < 1:
-            return True
-        return False
+            return True, "out of bounds"
+        if np.linalg.norm(self.state[:2] - self.goal[:2]) < self.goal_tolerance:
+            return True, "goal reached"
+        return False, None
     
     def sample_states(self, num_samples):
         return np.random.uniform(-self.theta_limit, self.theta_limit, (num_samples, 4))

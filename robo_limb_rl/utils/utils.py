@@ -81,12 +81,13 @@ class DataLoader():
 
 # only for single environment
 class TrajData():
-    def __init__(self, state_orig_obs, state_new_obs, next_state_orig_obs, next_state_new_obs, action, reward, done):
+    def __init__(self, state_orig_obs, state_new_obs, next_state_orig_obs, next_state_new_obs, action, reward, done, lengths):
         self.observations = (state_orig_obs, state_new_obs)
         self.next_observations = (next_state_orig_obs, next_state_new_obs)
         self.actions = action
         self.rewards = reward
         self.dones = done
+        self.lengths = lengths
 # only for single environment 1d vector for observations
 class TrajReplayBuffer():
     def __init__(self, 
@@ -204,6 +205,7 @@ class TrajReplayBuffer():
         else:
             index_to_clip_end = max_length
             
+        index_to_clip_end = self.max_seq_len    
         # index_to_clip_end = np.random.randint(min_length, max_length) if min_length < max_length elif  np.random.randint(self.min_seq_len, max_length)
         index_to_clip_head = np.random.randint(0, index_to_clip_end - self.min_seq_len) if index_to_clip_end - self.min_seq_len < min_length and index_to_clip_end - self.min_seq_len > 0 else 0
         # disabling random to help with stable training
@@ -215,8 +217,7 @@ class TrajReplayBuffer():
         padded_trajs_actions = self.trajs_actions[sampled_indices][:, index_to_clip_head:index_to_clip_end]
         padded_trajs_rewards = self.trajs_rewards[sampled_indices][:, index_to_clip_head:index_to_clip_end]
         padded_trajs_dones = self.trajs_dones[sampled_indices][:, index_to_clip_head:index_to_clip_end]
-        
-        index_to_clip_end = self.max_seq_len
+        # print("Padded Trajs Length", padded_trajs_orig_obs.shape)
         
         clipped_trajs_length = torch.clamp(trajs_lengths, max=index_to_clip_end) - index_to_clip_head
         # print("Clipped Trajs Length", clipped_trajs_length)
@@ -234,10 +235,13 @@ class TrajReplayBuffer():
         tensor_trajs_next_states_orig_obs = torch.nn.utils.rnn.pack_padded_sequence(padded_trajs_next_states_orig_obs, lengths=clipped_trajs_length, batch_first=True, enforce_sorted=False).to(self.device)
         tensor_trajs_next_states_new_obs = torch.nn.utils.rnn.pack_padded_sequence(padded_trajs_next_states_new_obs, lengths=clipped_trajs_length, batch_first=True, enforce_sorted=False).to(self.device)
         
+        # print("sampled actions", padded_trajs_actions)
         # print(torch.tensor(last_step_ind).unsqueeze(-1).expand(-1, padded_trajs_actions.shape[-1]).unsqueeze(1).shape)
         tensor_trajs_actions = torch.gather(padded_trajs_actions, dim=1, index=last_step_ind.unsqueeze(-1).expand(-1, padded_trajs_actions.shape[-1]).unsqueeze(1)).squeeze(1).to(self.device)
         tensor_trajs_rewards = torch.gather(padded_trajs_rewards, dim=1, index=last_step_ind.unsqueeze(-1)).to(self.device)
         tensor_trajs_dones = torch.gather(padded_trajs_dones, dim=1, index=last_step_ind.unsqueeze(-1)).to(self.device)
+        
+        # print("picked actions", tensor_trajs_actions)
         
         tensor_trajs_rewards = tensor_trajs_rewards.type(torch.float)
         tensor_trajs_actions = tensor_trajs_actions.type(torch.float)
@@ -250,7 +254,8 @@ class TrajReplayBuffer():
                         tensor_trajs_next_states_new_obs, 
                         tensor_trajs_actions, 
                         tensor_trajs_rewards, 
-                        tensor_trajs_dones)
+                        tensor_trajs_dones,
+                        clipped_trajs_length)
 
 
 # Dealing with packed sequence and padded sequences
