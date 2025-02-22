@@ -131,7 +131,7 @@ if __name__ == "__main__":
     assert isinstance(envs.single_action_space, gym.spaces.Box), "only continuous action space is supported"
 
     max_action = float(envs.single_action_space.high[0])
-    template_env = gym.make(args.env_id, config_path=args.config_path, render_mode=None)
+    template_env = gym.make(args.env_id, config_path=args.config_path, render_mode=None, evals=True)
     hidden_dim = template_env.unwrapped.hidden_dim
     num_layers = template_env.unwrapped.num_layers
     included_power = template_env.unwrapped.include_power_calc
@@ -341,25 +341,25 @@ if __name__ == "__main__":
             print(f"model saved to {model_path}")
             
             # Testing goal reach percentage, i.e. test the actor for 100 episodes, see how many times it reaches goal
-            print("...Evaluating agent...")
-            successful_episodes = 0
-            for episode in tqdm(range(100)):
-                eval_obs, _ = template_env.reset()
-                eval_obs_history = torch.Tensor(eval_obs).to(device).unsqueeze(0).unsqueeze(0)
-                # print(eval_obs_history.shape)
-                # print(f"Eval Episode {episode}")
-                for _ in range(250):
-                    with torch.no_grad():
-                        eval_actions, _, _ = agent.get_action(eval_obs_history)
-                        eval_obs, _, termination, _,  _ = template_env.step(eval_actions[0].cpu().numpy())
-                        eval_obs_history = torch.cat((eval_obs_history, torch.Tensor(eval_obs).to(device).unsqueeze(0).unsqueeze(0)), dim=1)
-                        if eval_obs_history.shape[1] > 100:
-                            eval_obs_history = eval_obs_history[:, -100:, :]
-                        if termination:
-                            if template_env.check_termination()[1] == "goal reached":
-                                successful_episodes += 1
-                            break
-            writer.add_scalar("evals/success_rate", successful_episodes/100, global_step)
+            # print("...Evaluating agent...")
+            # successful_episodes = 0
+            # for episode in tqdm(range(100)):
+            #     eval_obs, _ = template_env.reset()
+            #     eval_obs_history = torch.Tensor(eval_obs).to(device).unsqueeze(0).unsqueeze(0)
+            #     # print(eval_obs_history.shape)
+            #     # print(f"Eval Episode {episode}")
+            #     for _ in range(250):
+            #         with torch.no_grad():
+            #             eval_actions, _, _ = agent.get_action(eval_obs_history)
+            #             eval_obs, _, termination, _,  _ = template_env.step(eval_actions[0].cpu().numpy())
+            #             eval_obs_history = torch.cat((eval_obs_history, torch.Tensor(eval_obs).to(device).unsqueeze(0).unsqueeze(0)), dim=1)
+            #             if eval_obs_history.shape[1] > 100:
+            #                 eval_obs_history = eval_obs_history[:, -100:, :]
+            #             if termination:
+            #                 if template_env.check_termination()[1] == "goal reached":
+            #                     successful_episodes += 1
+            #                 break
+            # writer.add_scalar("evals/success_rate", successful_episodes/100, global_step)
                     
     model_path = f"../policies/{run_name}/agent_{args.exp_name}.cleanrl_model"
     torch.save((agent.state_dict()), model_path)

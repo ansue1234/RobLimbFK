@@ -100,9 +100,9 @@ class EmptyHead(nn.Module):
 class QNetwork(nn.Module):
     def __init__(self, input_dim):
         super().__init__()
-        self.fc1 = nn.Linear(input_dim, 128)
-        self.fc2 = nn.Linear(128, 64)
-        self.fc3 = nn.Linear(64, 1)
+        self.fc1 = nn.Linear(input_dim, 256)
+        self.fc2 = nn.Linear(256, 256)
+        self.fc3 = nn.Linear(256, 1)
 
     def forward(self, x, a):
         x = torch.cat([x, a], 1)
@@ -115,10 +115,10 @@ class QNetwork(nn.Module):
 class SACActor(nn.Module):
     def __init__(self, input_dim, action_space):
         super().__init__()
-        self.fc1 = nn.Linear(input_dim, 128)
-        self.fc2 = nn.Linear(128, 64)
-        self.fc_mean = nn.Linear(64, np.prod(action_space.shape))
-        self.fc_logstd = nn.Linear(64, np.prod(action_space.shape))
+        self.fc1 = nn.Linear(input_dim, 256)
+        self.fc2 = nn.Linear(256, 256)
+        self.fc_mean = nn.Linear(256, np.prod(action_space.shape))
+        self.fc_logstd = nn.Linear(256, np.prod(action_space.shape))
         # action rescaling
         self.register_buffer(
             "action_scale", torch.tensor((action_space.high - action_space.low) / 2.0, dtype=torch.float32)
@@ -241,6 +241,7 @@ class RLAgent(nn.Module):
         if type(x) == tuple:
             obs, power_goal = x[0], x[1]
             power_goal = last_items(power_goal, unsort=True)
+            # print("power_goal", power_goal)
         else:
             obs = x[:,:,:self.state_dim]
             power_goal = x[:,-1, self.state_dim:]

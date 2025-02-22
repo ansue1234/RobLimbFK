@@ -17,6 +17,6 @@ full_reset_prob: 0.01
 domain_randomization: False
 include_velocity: True
 include_power_calc: False
-reach_pen_weight: 0.01
+reach_pen_weight: 1
 vel_pen_weight: 1
 path_pen_weight: 1

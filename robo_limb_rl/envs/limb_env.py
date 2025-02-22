@@ -17,7 +17,7 @@ class LimbEnv(gym.Env):
     metadata = {
         "render_mode": ["human", None],
     }
-    def __init__(self, config_path, render_mode='human', seed=None):
+    def __init__(self, config_path, render_mode='human', seed=None, evals=False, max_steps=200000):
         super(LimbEnv, self).__init__()
         
         with open(config_path, 'r') as file:
@@ -47,6 +47,8 @@ class LimbEnv(gym.Env):
         self.include_power_calc = config.get('include_power_calc', False)
         self.cooling_constant = config.get('cooling_constant', 0.2)
         self.include_velocity = config.get('include_velocity', False)
+        self.max_steps = max_steps
+        self.evals = evals
         self.render_mode = render_mode
         self.seed = seed
         
@@ -90,6 +92,8 @@ class LimbEnv(gym.Env):
         
         self.load_model(self.model_path)
         self.model.eval()
+        
+        self.t = 0
         
         # Setting up config for domain randomization
         self.amp_scalar_low = 0.5
@@ -254,6 +258,13 @@ class LimbEnv(gym.Env):
         if self.vel_type == 'computed':
             vel = (self.state[:2] - prev_state[:2]) / self.dt
             self.state[2:] = vel
+            
+        self.t += 1
+        
+        # Linearly decrese goal tolerance base on time
+        if not self.evals: 
+            self.goal_tolerance = max(25 - self.t/(self.max_steps*0.5), self.goal_tolerance)
+        # print("t", self.t)
         # compute reward
         reward, rew_comp = self.compute_reward(self.state, self.goal, action)
         
@@ -353,15 +364,15 @@ class LimbEnv(gym.Env):
     def compute_reward(self, state, goal, action):
         # idea from openai gym's reacher-v2 reward function
         reward_components = {}
-        reward_components['reach_rew'] = - self.reach_pen_weight*(np.linalg.norm(state[:2] - goal[:2])**2 + np.sum(action**2))
+        reward_components['reach_rew'] = - self.reach_pen_weight*(np.linalg.norm(state[:2] - goal[:2]) + np.sum(action**2))
         terminated, reason = self.check_termination()
         if terminated and reason == "goal reached":
             reward_components['goal_reward'] = 10000
             if self.include_velocity:
                 reward_components['vel_rew'] = - self.vel_pen_weight*(np.sqrt(np.round(np.linalg.norm(state[2:4])*np.linalg.norm(goal[2:4]) - np.dot(state[2:4], goal[2:4]), 2)))
             print("Goal Reached")
-        elif terminated and reason == "out of bounds":
-            reward_components['out_of_bounds'] = -50000
+        elif reason == "out of bounds":
+            # reward_components['out_of_bounds'] = -100
             print("Out of bounds")
         # if np.linalg.norm(state[:2] - goal[:2]) < 1:
         #     reward_components['path_rew'] = self.path_pen_weight*(np.linalg.norm(state[:2] - goal[:2])/(self.traveled_length + 1e-6))
@@ -369,9 +380,9 @@ class LimbEnv(gym.Env):
     
     def check_termination(self):
         if self.state[0] > self.theta_limit or self.state[0] < -self.theta_limit or self.state[1] > self.theta_limit or self.state[1] < -self.theta_limit:
-            return True, "out of bounds"
+            return False, "out of bounds"
         if self.state[2] > self.theta_limit or self.state[2] < -self.theta_limit or self.state[3] > self.theta_limit or self.state[3] < -self.theta_limit:
-            return True, "out of bounds"
+            return False, "out of bounds"
         if np.linalg.norm(self.state[:2] - self.goal[:2]) < self.goal_tolerance:
             return True, "goal reached"
         return False, None
