@@ -19,6 +19,7 @@ class Dynamics:
         self.f_u = f_u
         if torch_model:
             self.f_prime = lambda x, u, h: (f_x(x, u, h), f_u(x, u, h))
+            self.num_layers = f.num_layers
         else:
             self.f_prime = njit(lambda x, u: (f_x(x,u), f_u(x,u)))
 
@@ -140,3 +141,13 @@ class Cost:
         L  = er.T@Q@er + u.T@R@u
         Lf = er.T@QT@er
         return Cost.Symbolic(L[0] + add_on, Lf[0], x, u)
+
+class CEMCost:
+    def __init__(self, Q, R):
+        self.Q = Q
+        self.R = R
+    
+    @njit
+    def L(self, x, u, x_goal):
+        er = x - x_goal
+        return er.T@self.Q@er + u.T@self.R@u

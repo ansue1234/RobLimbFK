@@ -26,6 +26,8 @@ class LimbModel(nn.Module):
         self.model.load_state_dict(torch.load(model_path, map_location=self.device, weights_only=True))
         self.model.encoder.h0, self.model.encoder.c0 = self.hidden
         self.input_size = input_size
+        self.num_layers = num_layers
+        self.hidden_size = hidden_size
         self.t = 0
 
     def forward(self, x, u, hidden, grad=True):

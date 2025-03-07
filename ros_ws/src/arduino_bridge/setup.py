@@ -1,5 +1,6 @@
 from setuptools import find_packages, setup
-
+import os
+from glob import glob
 package_name = 'arduino_bridge'
 
 setup(
@@ -10,6 +11,7 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        (os.path.join('share', package_name), glob('launch/*.launch'))
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -21,7 +23,8 @@ setup(
     entry_points={
         'console_scripts': [
             'bridge = arduino_bridge.bridge:main',
-            'teleop = arduino_bridge.teleop:main'
+            'teleop = arduino_bridge.teleop:main',
+            'simulator = arduino_bridge.simulator:main',
         ],
     },
 )

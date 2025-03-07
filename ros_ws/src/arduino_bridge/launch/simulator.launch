@@ -1,0 +1,11 @@
+<!-- example.launch.xml -->
+
+<launch>
+  <!-- <node pkg="arduino_bridge" exec="teleop" name="tele">
+    <remap from="/throttle" to="/raw_throttle"/>
+  </node> -->
+  <!-- perform remap so both turtles listen to the same command topic -->
+  <node pkg="arduino_bridge" exec="simulator" name="sim">
+    <param name="model_path" value="/home/ansue1234/Research/SML/RobLimbFK/ros_ws/src/model_runner/models/SEQ2SEQ_b512_e400_s-1_len100_no_cool_down_new_no_time_1724791809"/>
+  </node>
+</launch>

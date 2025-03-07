@@ -30,6 +30,7 @@ setup(
             'broadcaster=model_runner.broadcaster:main',
             'policy=model_runner.policy:main',
             'feeder=model_runner.waypoint_feeder:main',
+            'pid=model_runner.pid:main',
         ],
     },
 )

@@ -3,6 +3,7 @@ import numpy as np
 from numba import njit
 import torch
 
+
 def GetSyms(n_x, n_u):
   '''
       Returns matrices with symbolic variables for states and actions
@@ -62,7 +63,7 @@ def Smooth_abs(x, alpha = 0.25):
     return sp.sqrt(x**2 + alpha**2) - alpha
 
 
-@njit
+# @njit
 def FiniteDiff(fun, x, u, i, eps):
   '''
      Finite difference approximation
@@ -98,14 +99,14 @@ def autograd_jacobian(fun, x, u, hidden, i):
     """
     if i == 0:
         # Differentiate with respect to x
-        x = x.clone().detach().requires_grad_(True)
+        x = torch.tensor(x, dtype=torch.float32, requires_grad=True)
         # Define a function of x with u fixed
         f = lambda x_: fun(x_, u, hidden)
         # Compute the Jacobian
         jac = torch.autograd.functional.jacobian(f, x)
     elif i == 1:
         # Differentiate with respect to u
-        u = u.clone().detach().requires_grad_(True)
+        u = torch.tensor(u, dtype=torch.float32, requires_grad=True)
         # Define a function of u with x fixed
         f = lambda u_: fun(x, u_, hidden)
         # Compute the Jacobian
@@ -139,3 +140,33 @@ def sympy_to_numba(f, args, redu = True):
 
     f = sp.lambdify(args, f, modules = modules)
     return njit(f)
+
+# Finds KL Divergence
+@njit
+def kl_divergence(mu0, sigma0, mu1, sigma1):
+    """
+    Compute the KL divergence between two multivariate Gaussians:
+        P ~ N(mu0, sigma0)
+        Q ~ N(mu1, sigma1)
+    
+    Parameters:
+        mu0 (np.ndarray): Mean vector of P.
+        sigma0 (np.ndarray): Covariance matrix of P.
+        mu1 (np.ndarray): Mean vector of Q.
+        sigma1 (np.ndarray): Covariance matrix of Q.
+    
+    Returns:
+        float: The KL divergence D_KL(P || Q).
+    """
+    k = mu0.shape[0]
+    sigma1_inv = np.linalg.inv(sigma1)
+    det_sigma1 = np.linalg.det(sigma1)
+    det_sigma0 = np.linalg.det(sigma0)
+    
+    term1 = np.log(det_sigma1 / det_sigma0)
+    term2 = np.trace(np.dot(sigma1_inv, sigma0))
+    
+    diff = mu1 - mu0
+    term3 = np.dot(diff.T, np.dot(sigma1_inv, diff))
+    
+    return 0.5 * (term1 - k + term2 + term3)
