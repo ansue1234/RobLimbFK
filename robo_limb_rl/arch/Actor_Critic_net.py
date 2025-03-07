@@ -100,9 +100,9 @@ class EmptyHead(nn.Module):
 class QNetwork(nn.Module):
     def __init__(self, input_dim):
         super().__init__()
-        self.fc1 = nn.Linear(input_dim, 256)
-        self.fc2 = nn.Linear(256, 256)
-        self.fc3 = nn.Linear(256, 1)
+        self.fc1 = nn.Linear(input_dim, 128) # Original 256
+        self.fc2 = nn.Linear(128, 128)
+        self.fc3 = nn.Linear(128, 1)
 
     def forward(self, x, a):
         x = torch.cat([x, a], 1)
@@ -115,10 +115,10 @@ class QNetwork(nn.Module):
 class SACActor(nn.Module):
     def __init__(self, input_dim, action_space):
         super().__init__()
-        self.fc1 = nn.Linear(input_dim, 256)
-        self.fc2 = nn.Linear(256, 256)
-        self.fc_mean = nn.Linear(256, np.prod(action_space.shape))
-        self.fc_logstd = nn.Linear(256, np.prod(action_space.shape))
+        self.fc1 = nn.Linear(input_dim, 128) # Original 256
+        self.fc2 = nn.Linear(128, 128)
+        self.fc_mean = nn.Linear(128, np.prod(action_space.shape))
+        self.fc_logstd = nn.Linear(128, np.prod(action_space.shape))
         # action rescaling
         self.register_buffer(
             "action_scale", torch.tensor((action_space.high - action_space.low) / 2.0, dtype=torch.float32)
@@ -208,11 +208,13 @@ class RLAgent(nn.Module):
             self.actor = SACActor(hidden_dim + np.prod(observation_space.shape) - self.state_dim, action_space)
         elif agent == 'TD3':
             self.actor = TD3Actor(hidden_dim + np.prod(observation_space.shape) - self.state_dim, action_space)
+        self.actor_layer_norm = nn.LayerNorm(self.hidden_dim)
 
         # Initialize critics
         self.critic1 = QNetwork(hidden_dim + np.prod(observation_space.shape) - self.state_dim + np.prod(action_space.shape))
         self.critic2 = QNetwork(hidden_dim + np.prod(observation_space.shape) - self.state_dim + np.prod(action_space.shape))
         self.freeze_head = freeze_head
+        self.critic_layer_norm = nn.LayerNorm(self.hidden_dim)
 
     def _get_features(self, x):
         # No context because each batch contains whole trajectory
@@ -249,6 +251,7 @@ class RLAgent(nn.Module):
         # Get features and update hidden state
         features, _ = self._get_features(obs)
         features = features.squeeze(1)
+        features = self.actor_layer_norm(features)
         
         features = torch.cat((features, power_goal), dim=1)
         # Get action from actor
@@ -266,6 +269,7 @@ class RLAgent(nn.Module):
             
         features, _ = self._get_features(obs)
         features = features.squeeze(1)
+        features = self.critic_layer_norm(features)
         # unpacking power goal
         
         

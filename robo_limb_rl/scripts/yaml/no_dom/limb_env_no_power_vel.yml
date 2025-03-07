@@ -19,4 +19,4 @@ include_velocity: True
 include_power_calc: False
 reach_pen_weight: 1
 vel_pen_weight: 1
-path_pen_weight: 1
+path_pen_weight: 10

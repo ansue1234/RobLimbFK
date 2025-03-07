@@ -126,7 +126,6 @@ class LimbEnv(gym.Env):
             self.action_space.seed(seed)
             self.observation_space.seed(seed)
         self.state = self.np_random.uniform(-75, 75, 4).astype(np.float32)
-        self.first_state = self.state
         
         self.reset()
         
@@ -194,7 +193,6 @@ class LimbEnv(gym.Env):
             
         first_data_entry = np.concatenate((self.state, np.array([0.0, 0.0])), dtype=np.float32)
         self.data = torch.tensor(first_data_entry).to(self.device).unsqueeze(0)
-        self.first_state = self.state
         
         if self.include_power_calc:
             return np.append(np.append(self.state, 
@@ -367,18 +365,16 @@ class LimbEnv(gym.Env):
         # idea from openai gym's reacher-v2 reward function
         reward_components = {}
         # make reward positive
-        # reward_components['reach_rew'] = - (np.linalg.norm(state[:2] - goal[:2]) + np.sum((action/10)**2))
-        reward_components['reach_rew'] = 100/(1 + 0.1*(np.linalg.norm(state[:2] - goal[:2]))) - (100/11)
-        reward_components['time_penalty'] = -10
+        reward_components['reach_rew'] = - (np.linalg.norm(state[:2] - goal[:2]) + np.sum(action**2))
+        # reward_components['reach_rew'] = 100/(1 + 0.1*(np.linalg.norm(state[:2] - goal[:2]))) - (100/11)
         terminated, reason = self.check_termination()
         if terminated and reason == "goal reached":
             reward_components['goal_reward'] = 100
             if self.include_velocity:
                 reward_components['vel_rew'] = - self.vel_pen_weight*(np.sqrt(np.round(np.linalg.norm(state[2:4])*np.linalg.norm(goal[2:4]) - np.dot(state[2:4], goal[2:4]), 2)))
-            # reward_components['path_rew'] = self.path_pen_weight*(np.linalg.norm(self.first_state[:2] - goal[:2])/(self.traveled_length + 1e-6))
+            # reward_components['path_rew'] = self.path_pen_weight*(np.linalg.norm(state[:2] - goal[:2])/(self.traveled_length + 1e-6))
             print("Goal Reached")
         elif reason == "out of bounds":
-            reward_components['goal_reward'] = -1000
             print("Out of bounds")
         # if np.linalg.norm(state[:2] - goal[:2]) < 1:
         #     reward_components['path_rew'] = self.path_pen_weight*(np.linalg.norm(state[:2] - goal[:2])/(self.traveled_length + 1e-6))
