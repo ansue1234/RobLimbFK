@@ -26,7 +26,8 @@ class CEMPlanner:
                  init_err_mu=None,
                  init_err_cov=None,
                  init_u_disturbance_mu=None,
-                 init_u_disturbance_cov=None):
+                 init_u_disturbance_cov=None,
+                 debugger=None):
         self.dynamics = dynamics
         self.cost = cost
         self.horizon = horizon
@@ -38,7 +39,7 @@ class CEMPlanner:
         # Initialize mean and variance for the control trajectory.
         self.u_dim = u_dim
         self.dim = self.horizon * u_dim
-        self.mean = np.zeros((horizon, u_dim)) if init_mean is None else init_mean
+        self.mean = np.zeros(self.dim) if init_mean is None else init_mean
         self.cov = noise_factor * np.eye(self.dim) if init_cov is None else init_cov
         self.best_u = None
         self.best_cost = np.inf
@@ -54,7 +55,7 @@ class CEMPlanner:
         self.u_disturbance_cov = np.eye(u_dim) if init_u_disturbance_cov is None else init_u_disturbance_cov
         self.window = 1000
         self.num_steps = 0
-        
+        self.debugger = debugger
 
     def iterate(self, x0, xgoal):
         """
@@ -64,7 +65,7 @@ class CEMPlanner:
         distribution parameters.
         """
         # Sample control trajectories as vectors of length dim.
-        samples_vector = njit(np.random.multivariate_normal)(self.mean, self.cov, size=self.num_samples)
+        samples_vector = np.random.multivariate_normal(self.mean, self.cov, size=self.num_samples)
         # Reshape each sample vector to shape (horizon, u_dim)
         samples = samples_vector.reshape(self.num_samples, self.horizon, self.u_dim)
         
@@ -73,25 +74,26 @@ class CEMPlanner:
             h = self.h[0].clone(), self.h[1].clone()
             # Evaluate cost for each sample trajectory.
             # Optimize using batch processing.
-            x = x0.copy()
+            x = x0.clone()
             for t in range(self.horizon):
                 x, h, costs_time_step, = simulate_torch(x, h, samples[:, t], self.dynamics.f, self.cost.L, xgoal)
+                
                 costs[:, t] = costs_time_step
             # Compute total cost for each sample trajectory.
             costs = np.sum(costs, axis=1)
             # Select elite samples (lowest costs)
-            elite_indices = njit(np.argsort)(costs)[:self.num_elite]
+            elite_indices = njit(lambda a: np.argsort(a))(costs)[:self.num_elite]
             elites = samples[elite_indices]
             
             # Optionally, update best found trajectory.
-            current_best_idx = njit(np.argmin)(costs)
+            current_best_idx = njit(lambda a: np.argmin(a))(costs)
             if costs[current_best_idx] < self.best_cost:
                 self.best_cost = costs[current_best_idx]
                 self.best_u = samples[current_best_idx]
                 self.h = h[0][:, current_best_idx, :], h[1][:, current_best_idx, :]
                 
-            new_mean = njit(np.mean)(elites, axis=0)
-            new_cov = njit(np.cov)(elites, rowvar=False)
+            new_mean = njit(lambda a, b: np.mean(a, axis=b))(elites, 0)
+            new_cov = njit(lambda a, b: np.cov(a, rowvar=b))(elites, False)
             # Smoothly update the distribution parameters.
             updated_mean = self.alpha * new_mean + (1 - self.alpha) * self.mean
             updated_cov = self.alpha * new_cov + (1 - self.alpha) * self.cov
@@ -127,13 +129,13 @@ class CEMPlanner:
         delta = diff - self.u_disturbance_mu
         delta = delta.to_numpy()
         # spectral decomp error covariance   
-        U, S, V = np.linalg.svd(self.u_disturbance_cov)
-        rotated_delta = np.dot(V.T, delta)
+        U, S, V = njit(lambda a: np.linalg.svd(a))(self.u_disturbance_cov)
+        rotated_delta = njit(lambda a, b: np.dot(a, b))(V.T, delta)
         # Check if each dimension of rotated delta is within 3 standard deviations
         # of the corresponding dimension of the error covariance
         good_us = us[np.abs(rotated_delta) < 3 * np.sqrt(S)]
-        self.u_disturbance_mu = np.mean(good_us, axis=0)
-        self.u_disturbance_cov = np.cov(good_us, rowvar=False)
+        self.u_disturbance_mu = njit(lambda a, b: np.mean(a, axis=b))(good_us, 0)
+        self.u_disturbance_cov = njit(lambda a, b: np.cov(a, rowvar=b))(good_us, False)
             
         
         
@@ -350,7 +352,7 @@ def simulate(x0, U, f, L, Lf):
 def simulate_torch(x0, h0, U, f, L, xgoal):
     T = U.shape[0]
     x = x0.clone()
-    h = h0.clone()
+    h = (h0[0].clone(), h0[1].clone())
     x_next, hs = f(x, U, h, grad=False)
     cost = L(x, U, xgoal)
     return x_next, hs, cost

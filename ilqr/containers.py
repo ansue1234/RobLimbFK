@@ -6,7 +6,7 @@ from .utils import *
 
 class Dynamics:
 
-    def __init__(self, f, f_x, f_u, torch_model = False):
+    def __init__(self, f, f_x, f_u, torch_model = False, debugger=None):
         '''
            Dynamics container.
               f: Function approximating the dynamics.
@@ -17,9 +17,12 @@ class Dynamics:
         self.f = f
         self.f_x = f_x
         self.f_u = f_u
+        self.debugger = debugger
+        self.f.debugger = debugger
         if torch_model:
             self.f_prime = lambda x, u, h: (f_x(x, u, h), f_u(x, u, h))
             self.num_layers = f.num_layers
+            self.hidden_size = f.hidden_size
         else:
             self.f_prime = njit(lambda x, u: (f_x(x,u), f_u(x,u)))
 
@@ -35,13 +38,13 @@ class Dynamics:
         return Dynamics(f, f_x, f_u)
     
     @staticmethod
-    def Torch(f):
+    def Torch(f, debugger=None):
         '''
            Construct from a torch model
         '''
         f_x = lambda x, u, h: autograd_jacobian(f, x, u, h, 0)
         f_u = lambda x, u, h: autograd_jacobian(f, x, u, h, 1)
-        return Dynamics(f, f_x, f_u, torch_model = True)
+        return Dynamics(f, f_x, f_u, torch_model = True, debugger=debugger)
 
 
     @staticmethod

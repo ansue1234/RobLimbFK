@@ -5,6 +5,7 @@ import torch
 from interfaces.msg import Throttle, State, Angles
 from robo_limb_ml.models.fk_seq2seq import FK_SEQ2SEQ
 from matplotlib import pyplot as plt
+import numpy as np
 
 class Simulator(Node):
     def __init__(self):
@@ -24,7 +25,8 @@ class Simulator(Node):
                 ('freq', 20),               # update frequency in Hz
                 ('throttle_scaling', 10.0),  # scale factor for throttle inputs
                 ('dt', 0.075),              # time step in seconds
-                ('visualize', True)         # if True, visualize the movement
+                ('visualize', True),         # if True, visualize the movement
+                ('rand_noise', True)        # if True, add random noise to the prediction
             ]
         )
         # Retrieve parameters
@@ -40,7 +42,8 @@ class Simulator(Node):
         self.throttle_scaling = self.get_parameter('throttle_scaling').get_parameter_value().double_value
         self.dt = self.get_parameter('dt').get_parameter_value().double_value
         self.visualize = self.get_parameter('visualize').get_parameter_value().bool_value
-
+        self.rand_noise = self.get_parameter('rand_noise').get_parameter_value().bool_value
+        
         self.state_pub = self.create_publisher(State, 'state', 1)
         self.angle_pub = self.create_publisher(Angles, 'limb_angles', 1)
 
@@ -180,10 +183,17 @@ class Simulator(Node):
         # Publish sensor message (Angles)
         # Publish full state messages
         ang = Angles()
-        ang.theta_x = self.current_state.theta_x
-        ang.theta_y = self.current_state.theta_y
+        disturb_x = np.random.normal(0, 1) if self.rand_noise else 0
+        disturb_y = np.random.normal(0, 1) if self.rand_noise else 0
+        state_to_publish = State()
+        state_to_publish.theta_x = self.current_state.theta_x + disturb_x
+        state_to_publish.theta_y = self.current_state.theta_y + disturb_y
+        state_to_publish.vel_x = self.current_state.vel_x
+        state_to_publish.vel_y = self.current_state.vel_y
+        ang.theta_x = state_to_publish.theta_x
+        ang.theta_y = state_to_publish.theta_y
         self.angle_pub.publish(ang)
-        self.state_pub.publish(self.current_state)
+        self.state_pub.publish(state_to_publish)
     
     def _viz(self):
         if self.goal:

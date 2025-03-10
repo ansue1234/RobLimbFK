@@ -5,7 +5,7 @@ import numpy as np
 from robo_limb_ml.models.fk_seq2seq import FK_SEQ2SEQ
 
 class LimbModel(nn.Module):
-    def __init__(self, model_path, input_size, hidden_size, num_layers, attention, device):
+    def __init__(self, model_path, input_size, hidden_size, num_layers, attention, device, debugger=None):
         super(LimbModel, self).__init__()
         
         self.device = device
@@ -28,11 +28,13 @@ class LimbModel(nn.Module):
         self.input_size = input_size
         self.num_layers = num_layers
         self.hidden_size = hidden_size
+        self.debugger = debugger
         self.t = 0
 
     def forward(self, x, u, hidden, grad=True):
         u = torch.tensor(u, dtype=torch.float32)
         x = torch.tensor(x, dtype=torch.float32)
+        self.debugger.get_logger().info("x, u:" + str(x.shape) + str(u.shape))
         x_u = torch.cat((x, u), 0).unsqueeze(0).unsqueeze(0)
         # x = torch.tensor(x, dtype=torch.float32)
         if grad:
