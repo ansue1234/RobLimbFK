@@ -100,9 +100,9 @@ class EmptyHead(nn.Module):
 class QNetwork(nn.Module):
     def __init__(self, input_dim):
         super().__init__()
-        self.fc1 = nn.Linear(input_dim, 128) # Original 256
-        self.fc2 = nn.Linear(128, 128)
-        self.fc3 = nn.Linear(128, 1)
+        self.fc1 = nn.Linear(input_dim, 512) # Original 256
+        self.fc2 = nn.Linear(512, 512)
+        self.fc3 = nn.Linear(512, 1)
 
     def forward(self, x, a):
         x = torch.cat([x, a], 1)
@@ -115,10 +115,10 @@ class QNetwork(nn.Module):
 class SACActor(nn.Module):
     def __init__(self, input_dim, action_space):
         super().__init__()
-        self.fc1 = nn.Linear(input_dim, 128) # Original 256
-        self.fc2 = nn.Linear(128, 128)
-        self.fc_mean = nn.Linear(128, np.prod(action_space.shape))
-        self.fc_logstd = nn.Linear(128, np.prod(action_space.shape))
+        self.fc1 = nn.Linear(input_dim, 512) # Original 256
+        self.fc2 = nn.Linear(512, 512)
+        self.fc_mean = nn.Linear(512, np.prod(action_space.shape))
+        self.fc_logstd = nn.Linear(512, np.prod(action_space.shape))
         # action rescaling
         self.register_buffer(
             "action_scale", torch.tensor((action_space.high - action_space.low) / 2.0, dtype=torch.float32)

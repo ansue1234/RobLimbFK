@@ -55,9 +55,9 @@ class Args:
     """the batch size of sample from the reply memory"""
     learning_starts: int = 5e3
     """timestep to start learning"""
-    policy_lr: float = 1e-4
+    policy_lr: float = 5e-4
     """the learning rate of the policy network optimizer"""
-    q_lr: float = 1e-4
+    q_lr: float = 5e-4
     """the learning rate of the Q network network optimizer"""
     policy_frequency: int = 2
     """the frequency of training policy (delayed)"""

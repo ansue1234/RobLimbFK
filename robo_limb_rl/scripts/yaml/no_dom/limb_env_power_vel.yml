@@ -18,5 +18,5 @@ domain_randomization: False
 include_velocity: True
 include_power_calc: True
 reach_pen_weight: 1
-vel_pen_weight: 0.5
-path_pen_weight: 10
+vel_pen_weight: 1
+path_pen_weight: 1

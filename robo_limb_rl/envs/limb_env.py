@@ -369,10 +369,10 @@ class LimbEnv(gym.Env):
         # make reward positive
         # reward_components['reach_rew'] = - (np.linalg.norm(state[:2] - goal[:2]) + np.sum((action/10)**2))
         reward_components['reach_rew'] = 100/(1 + 0.1*(np.linalg.norm(state[:2] - goal[:2]))) - (100/11)
-        reward_components['time_penalty'] = -10
+        reward_components['time_penalty'] = -1
         terminated, reason = self.check_termination()
         if terminated and reason == "goal reached":
-            reward_components['goal_reward'] = 100
+            reward_components['goal_reward'] = 1000
             if self.include_velocity:
                 reward_components['vel_rew'] = - self.vel_pen_weight*(np.sqrt(np.round(np.linalg.norm(state[2:4])*np.linalg.norm(goal[2:4]) - np.dot(state[2:4], goal[2:4]), 2)))
             # reward_components['path_rew'] = self.path_pen_weight*(np.linalg.norm(self.first_state[:2] - goal[:2])/(self.traveled_length + 1e-6))
