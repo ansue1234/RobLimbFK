@@ -170,3 +170,10 @@ def kl_divergence(mu0, sigma0, mu1, sigma1):
     term3 = np.dot(diff.T, np.dot(sigma1_inv, diff))
     
     return 0.5 * (term1 - k + term2 + term3)
+
+
+def mean(a):
+    return np.mean(a, axis=0)
+
+def covar(a):
+    return np.cov(a, rowvar=False)

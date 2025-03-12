@@ -32,10 +32,14 @@ class LimbModel(nn.Module):
         self.t = 0
 
     def forward(self, x, u, hidden, grad=True):
-        u = torch.tensor(u, dtype=torch.float32)
-        x = torch.tensor(x, dtype=torch.float32)
-        self.debugger.get_logger().info("x, u:" + str(x.shape) + str(u.shape))
-        x_u = torch.cat((x, u), 0).unsqueeze(0).unsqueeze(0)
+        if type(u) == np.ndarray:
+            u = torch.tensor(u, dtype=torch.float32)
+            x = torch.tensor(x, dtype=torch.float32)
+        else:
+            u = u.clone()
+            x = x.clone()
+        # self.debugger.get_logger().info("x, u:" + str(x.shape) + str(u.shape))
+        x_u = torch.cat((x, u), 2)
         # x = torch.tensor(x, dtype=torch.float32)
         if grad:
             delta_state, hidden = self.model(x_u, None, hidden, mode='test')

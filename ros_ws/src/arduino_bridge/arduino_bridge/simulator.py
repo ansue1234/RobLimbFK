@@ -26,8 +26,9 @@ class Simulator(Node):
                 ('throttle_scaling', 10.0),  # scale factor for throttle inputs
                 ('dt', 0.075),              # time step in seconds
                 ('visualize', True),         # if True, visualize the movement
-                ('rand_noise', True)        # if True, add random noise to the prediction
-            ]
+                ('rand_noise', True),        # if True, add random noise to the prediction
+                ('reactive', True)         # if True, only run prediction when new throttle command is received
+            ]   
         )
         # Retrieve parameters
         self.seq_len = self.get_parameter('seq_len').get_parameter_value().integer_value
@@ -43,6 +44,7 @@ class Simulator(Node):
         self.dt = self.get_parameter('dt').get_parameter_value().double_value
         self.visualize = self.get_parameter('visualize').get_parameter_value().bool_value
         self.rand_noise = self.get_parameter('rand_noise').get_parameter_value().bool_value
+        self.reactive = self.get_parameter('reactive').get_parameter_value().bool_value
         
         self.state_pub = self.create_publisher(State, 'state', 1)
         self.angle_pub = self.create_publisher(Angles, 'limb_angles', 1)
@@ -61,7 +63,8 @@ class Simulator(Node):
         self.current_state.vel_x = 0.0
         self.current_state.vel_y = 0.0
 
-
+        # add capability to respond only to the latest throttle command
+        self.new_thr = False
         # Buffer for sequence inputs for the model
         self.data_input = None
 
@@ -111,6 +114,7 @@ class Simulator(Node):
             self.throttle_queue.pop(0)
         self.throttle_queue.append((thr_x, thr_y))
         # self.current_throttle = (msg.throttle_x, msg.throttle_y)
+        self.new_thr = True
         self.get_logger().info(f"Received throttle: {msg.throttle_x}, {msg.throttle_y}")
 
     def _get_state_vector(self):
@@ -127,11 +131,7 @@ class Simulator(Node):
                                     device=self.device, dtype=torch.float32)
         return curr_input
 
-    def timer_callback(self):
-        # Update time stamps
-        self.last_time = self.curr_time
-        self.curr_time = self.get_clock().now()
-        
+    def step(self):
         if len(self.throttle_queue) != 0:
             self.current_throttle = self.throttle_queue.pop(0)
         else:
@@ -178,6 +178,17 @@ class Simulator(Node):
             f"Time: {self.curr_time.nanoseconds * 1e-9}\n"
         )
         self.get_logger().info(log_line)
+    
+    def timer_callback(self):
+        # Update time stamps
+        self.last_time = self.curr_time
+        self.curr_time = self.get_clock().now()
+        if self.reactive:
+            if self.new_thr:
+                self.step()
+                self.new_thr = False
+        else:
+            self.step()
 
     def _publish_state(self):
         # Publish sensor message (Angles)

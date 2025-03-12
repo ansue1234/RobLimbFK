@@ -147,10 +147,25 @@ class Cost:
 
 class CEMCost:
     def __init__(self, Q, R):
-        self.Q = Q
-        self.R = R
+        self.Q = Q.astype(np.float64)
+        self.R = R.astype(np.float64)
     
-    @njit
-    def L(self, x, u, x_goal):
-        er = x - x_goal
-        return er.T@self.Q@er + u.T@self.R@u
+    def L(self, x, u, x_goal, debugger=None):
+        if x.shape[1] == 4:
+            x = x.copy()[:, :2]
+        x = x.astype(np.float64)
+        u = u.astype(np.float64)
+        x_goal = x_goal.astype(np.float64)
+        return _L_numba(x, u, x_goal, self.Q, self.R)
+
+@njit
+def _L_numba(x, u, x_goal, Q, R):
+    """
+    A numba-compiled function that expects x, u, x_goal, Q, R as raw NumPy arrays.
+    It returns the cost = diag((x - x_goal) Q (x - x_goal).T) + diag(u R u.T).
+    """
+    # If you need to handle x.shape[1] == 4 by slicing columns,
+    # you can do that logic here or do it before calling this function.
+    
+    er = x - x_goal
+    return np.diag(er @ Q @ er.T) + np.diag(u @ R @ u.T)
