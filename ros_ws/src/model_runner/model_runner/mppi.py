@@ -6,14 +6,14 @@ from rclpy.node import Node
 from interfaces.msg import Angles, Throttle, State
 from std_msgs.msg import Float64MultiArray, MultiArrayDimension, Bool
 
-from ilqr.controller import CEMPlanner, CEMBase
+from ilqr.controller import CEMPlanner, CEMBase, MPPIBase
 from ilqr.containers import Dynamics, CEMCost, LimbDynamics
 from ilqr.arch import LimbModel
 
 
-class CEMRunner(Node):
+class MPPIRunner(Node):
     def __init__(self):
-        super().__init__('CEM_controller')
+        super().__init__('MPPI_controller')
         
         # Declare parameters
         self.declare_parameters(

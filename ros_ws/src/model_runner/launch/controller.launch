@@ -5,12 +5,17 @@
     <!-- <remap from="/throttle" to="/raw_throttle"/> -->
     <!-- <param name="traj_path" value="/home/ansue1234/Research/SML/RobLimbFK/ros_ws/src/traj/trajectories_saw_tooth.csv"/>
   </node> -->
+  <node pkg="model_runner" exec="visualizer" name="visualizer">
+    <param name="traj_path" value="/home/ansue1234/Research/SML/RobLimbFK/ros_ws/src/traj/way_points_circ.csv"/>
+  </node>
   <node pkg="model_runner" exec="feeder" name="way_point_feeder">
-    <param name="traj_path" value="/home/ansue1234/Research/SML/RobLimbFK/ros_ws/src/traj/way_points_traj.csv"/>
+    <param name="traj_path" value="/home/ansue1234/Research/SML/RobLimbFK/ros_ws/src/traj/way_points_circ.csv"/>
+    <!-- <param name="random" value="false"/> -->
   </node>
   <!-- <node pkg="model_runner" exec="pid" name="pid_control"/> -->
-  <node pkg="model_runner" exec="pid" name="pid_control">
-    <!-- <param name="model_path" value="/home/ansue1234/Research/SML/RobLimbFK/ros_ws/src/model_runner/models/SEQ2SEQ_b512_e400_s-1_len100_no_cool_down_new_no_time_1724791809"/> -->
+  <node pkg="model_runner" exec="cem" name="cem_control">
+    <param name="model_path" value="/home/ansue1234/Research/SML/RobLimbFK/ros_ws/src/model_runner/models/SEQ2SEQ_b512_e400_s-1_len100_no_cool_down_new_no_time_1724791809"/>
+    <param name="double_shooting" value="false"/>
   </node>
   
   <!-- perform remap so both turtles listen to the same command topic -->

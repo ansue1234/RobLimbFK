@@ -80,7 +80,70 @@ class Dynamics:
         return Dynamics.SymDiscrete(x + f*dt, x, u)
 
 
-
+class LimbDynamics:
+    # Derived from Richard Desatnik's paper
+    k, c, a1, a2, a3, a4 = 0.33, 3.72, 1.95, 1.89, 1.54, 2.24
+    M = np.array([[ 1,  0,  0,  0,  0,   0,  0,   0],
+                  [-k, -c,  0,  0, a1, a2,  0,   0],
+                  [ 0,  0,  0,  1,  0,   0,  0,   0],
+                  [ 0,  0, -k, -c,  0,   0, a3, a4]])
+                           
+        
+    @staticmethod
+    @njit
+    def cont_dynamics(X, U, M):
+        n = X.shape[0]
+        # Compute PWM signals for each control input in a vectorized way
+        p_x_pos = np.where(U[:, 0] > 0, np.abs(U[:, 0]), 0.0)
+        p_x_neg = np.where(U[:, 0] < 0, np.abs(U[:, 0]), 0.0)
+        p_y_pos = np.where(U[:, 1] > 0, np.abs(U[:, 1]), 0.0)
+        p_y_neg = np.where(U[:, 1] < 0, np.abs(U[:, 1]), 0.0)
+        
+        # Construct the augmented state matrix: shape (n, 8)
+        aug_state = np.empty((n, 8), dtype=np.float64)
+        aug_state[:, 0:4] = X
+        aug_state[:, 4] = p_x_pos
+        aug_state[:, 5] = p_x_neg
+        aug_state[:, 6] = p_y_pos
+        aug_state[:, 7] = p_y_neg
+        return aug_state @ M.T
+    
+    @staticmethod
+    def f(x, u, dt=0.075):
+        """
+        Discretizes the dynamics using Euler integration:
+        x_{t+1} = x_t + dt * f(x_t, u_t) works because it is linear
+        """
+        dx = LimbDynamics.cont_dynamics(x, u, LimbDynamics.M)
+        return x + dt * dx
+    
+class LimbDynamicsLQR:
+    k, c, a1, a3 = 0.33, 3.72, 1.89, 1.89
+    M = np.array([[ 1,  0,  0,  0,  0,   0],
+                  [-k, -c,  0,  0, a1,  0],
+                  [ 0,  0,  0,  1,  0,  0],
+                  [ 0,  0, -k, -c,  0,  a3]])
+                           
+        
+    @staticmethod
+    @njit
+    def cont_dynamics(x, u, M):
+        
+        # Construct the augmented state matrix: shape (n, 8)
+        aug_state = np.empty(8, dtype=np.float64)
+        aug_state[:4] = x
+        aug_state[4:] = u
+        return M @ aug_state
+    
+    @staticmethod
+    def f(x, u, dt=0.075):
+        """
+        Discretizes the dynamics using Euler integration:
+        x_{t+1} = x_t + dt * f(x_t, u_t) works because it is linear
+        """
+        dx = LimbDynamics.cont_dynamics(x, u, LimbDynamics.M)
+        return x + dt * dx
+    
 class Cost:
 
     def __init__(self, L, L_x, L_u, L_xx, L_ux, L_uu, Lf, Lf_x, Lf_xx):
