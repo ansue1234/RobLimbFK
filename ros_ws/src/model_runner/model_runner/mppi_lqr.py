@@ -1,17 +1,15 @@
 import rclpy
 import numpy as np
-import torch
 from rclpy.node import Node
 
 from interfaces.msg import Angles, Throttle, State
 from std_msgs.msg import Float64MultiArray, MultiArrayDimension, Bool
 
-from ilqr.controller import CEMPlanner, CEMBase, MPPIBase
-from ilqr.containers import Dynamics, CEMCost, LimbDynamics
-from ilqr.arch import LimbModel
+from ilqr.controller import MPPIBase, FiniteHorizonLQRController
+from ilqr.containers import Dynamics, CEMCost, LimbDynamics, LimbDynamicsLQR
 
 
-class MPPIRunner(Node):
+class MPPI_LQRRunner(Node):
     def __init__(self):
         super().__init__('MPPI_controller')
         
@@ -19,76 +17,57 @@ class MPPIRunner(Node):
         self.declare_parameters(
             namespace='',
             parameters=[
-                ('cem.horizon', 10),
-                ('cem.num_samples', 1000),
-                ('cem.num_elite', 100),
-                ('cem.max_iters', 1),
-                ('cem.alpha', 0.5),
-                ('model_path', ''),
+                ('horizon', 10),
+                ('lambda', 1.0),
                 ('double_shooting', False),
-                ('dynamics', 'no_torch')
+                ('controller', 'MPPI')
             ]
         )
         
         # Retrieve parameters
-        horizon = self.get_parameter('cem.horizon').get_parameter_value().integer_value
-        num_samples = self.get_parameter('cem.num_samples').get_parameter_value().integer_value
-        num_elite = self.get_parameter('cem.num_elite').get_parameter_value().integer_value
-        max_iters = self.get_parameter('cem.max_iters').get_parameter_value().integer_value
-        alpha = self.get_parameter('cem.alpha').get_parameter_value().double_value
-        model_path = self.get_parameter('model_path').get_parameter_value().string_value
+        self.horizon = self.get_parameter('horizon').get_parameter_value().integer_value
+        self.lamb = self.get_parameter('lambda').get_parameter_value().double_value
         self.double_shooting = self.get_parameter('double_shooting').get_parameter_value().bool_value
-        self.dynamic_type = self.get_parameter('dynamics').get_parameter_value().string_value
-        # Load torch-based dynamics model
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        
-        if self.dynamic_type == 'torch':
-            # The LimbModel path, hidden sizes, etc. can be updated if arch.py changed
-            self.model = LimbModel(
-                model_path,   # Update to your new path if needed
-                input_size=6,       # Adjust if your new arch expects a different input size
-                hidden_size=512,
-                num_layers=3,
-                attention=False,
-                device=self.device
-            )
-            self.dynamics = Dynamics.Torch(self.model, self)
-        else:
-            self.get_logger().info("Using Numba-based dynamics")
-            self.dynamics = LimbDynamics()
+        self.controller = self.get_parameter('controller').get_parameter_value().string_value
+        self.mppi_dynamics = LimbDynamics()
+        self.lqr_dynamics = LimbDynamicsLQR()
+        self.lqr_controller = None
+        self.mppi_controller = None
+        self.mppi = False
+        self.lqr = False
         
         # Updated cost with final-cost weighting
         Q = np.eye(2) * 10.0
         R = np.eye(2) * 0.5
         self.cost = CEMCost(Q, R)
         
-        # Build the CEMPlanner
-        if self.dynamic_type == 'torch':
-            self.cem = CEMPlanner(
-                dynamics=self.dynamics,
+        if self.controller == 'MPPI':
+            self.mppi_controller = MPPIBase(
+                dynamics=self.mppi_dynamics,
                 cost=self.cost,
-                horizon=horizon,
+                horizon=self.horizon,
                 x_dim=2,
-                u_dim=2,
-                num_samples=num_samples,
-                num_elite=num_elite,
-                max_iters=max_iters,
-                alpha=alpha,
-                debugger=self
-            )
-        else:
-            self.cem = CEMBase(
-                dynamics=self.dynamics,
+                u_dim=2)
+            self.mppi = True
+        if self.controller == 'LQR':
+            self.lqr_controller = FiniteHorizonLQRController(
+                dynamics=self.lqr_dynamics,
                 cost=self.cost,
-                horizon=horizon,
+                horizon=self.horizon)
+            self.lqr = True
+        if self.controller == 'MPPI_LQR':
+            self.mppi_controller = MPPIBase(
+                dynamics=self.mppi_dynamics,
+                cost=self.cost,
+                horizon=self.horizon,
                 x_dim=2,
-                u_dim=2,
-                num_samples=num_samples,
-                num_elite=num_elite,
-                max_iters=max_iters,
-                alpha=alpha,
-                debugger=self
-            )
+                u_dim=2)
+            self.lqr_controller = FiniteHorizonLQRController(
+                dynamics=self.lqr_dynamics,
+                cost=self.cost,
+                horizon=self.horizon)
+            self.mppi = True
+            self.lqr = True
         
         # ROS publishers & subscribers
         self.throttle_pub = self.create_publisher(Throttle, 'throttle', 1)
@@ -118,12 +97,7 @@ class MPPIRunner(Node):
         # If controller is active, run
         if self.start_control:
             self.run_policy()
-    
-    # def angles_cb(self, msg: Angles):
-    #     self.curr_ang = msg
-    #     # If controller is active, run
-    #     if self.start_control:
-    #         self.run_policy()
+
 
     def run_policy(self):
         # No angles or goals yet?
@@ -139,15 +113,23 @@ class MPPIRunner(Node):
 
         # Get first-step control from CEM
         self.prev_u = self.best_u
-        self.best_u = self.cem.iterate(x0, xgoal)
-        if self.double_shooting and self.prev_u is not None:
+        if self.lqr and not self.mppi:
+            self.best_u = self.lqr_controller.iterate(x0, xgoal)
+        elif self.mppi and not self.lqr:
+            self.best_u = self.mppi_controller.iterate(x0, xgoal)
+        elif self.mppi and self.lqr:
+            lqr_u = self.lqr_controller.iterate(x0, xgoal)
+            self.best_u = self.mppi_controller.iterate(x0, xgoal, u_init=lqr_u)
+
+        if self.mppi and self.double_shooting and self.prev_u is not None:
             curr_state = np.array([self.curr_state.theta_x, self.curr_state.theta_y, self.curr_state.vel_x, self.curr_state.vel_y])
             # self.best_u = self.cem.double_shooting(curr_state, self.best_u)
             prev_state = np.array([self.prev_state.theta_x, self.prev_state.theta_y, self.prev_state.vel_x, self.prev_state.vel_y])
             # updates err distribution
-            self.cem.calc_diff(curr_state, prev_state, self.prev_u)
+            self.mppi_controller.calc_diff(curr_state, prev_state, self.prev_u)
             # updates disturbance distribution
-            self.best_u = self.cem.update_u_disturbance_distribution(curr_state)
+            self.best_u = self.mppi_controller.update_u_disturbance_distribution(curr_state)
+            
         self.best_u = np.clip(self.best_u, -10.0, 10.0)
         self.get_logger().info(f"Best u: {self.best_u}")
         # best_u is a 2D vector [u_x, u_y]. Clip & publish
@@ -155,12 +137,13 @@ class MPPIRunner(Node):
         throttle_msg.throttle_x = self.best_u[0]/10
         throttle_msg.throttle_y = self.best_u[1]/10
         self.throttle_pub.publish(throttle_msg)
-        self.pub_mat(self.cem.err_cov, self.err_cov_pub)
-        self.pub_vec(self.cem.err_mu, self.err_mean_pub)
-        self.pub_mat(self.cem.u_disturbance_cov, self.u_cov_pub)
-        self.pub_vec(self.cem.u_disturbance_mu, self.u_mean_pub)
-        self.pub_mat(self.cem.cov, self.cem_cov_pub)
-        self.pub_vec(self.cem.mean, self.cem_mean_pub)
+        if self.mppi:
+            self.pub_mat(self.mppi_controller.err_cov, self.err_cov_pub)
+            self.pub_vec(self.mppi_controller.err_mu, self.err_mean_pub)
+            self.pub_mat(self.mppi_controller.u_disturbance_cov, self.u_cov_pub)
+            self.pub_vec(self.mppi_controller.u_disturbance_mu, self.u_mean_pub)
+            self.pub_mat(self.mppi_controller.cov, self.cem_cov_pub)
+            self.pub_vec(self.mppi_controller.mean, self.cem_mean_pub)
         # self.get_logger().info("Error Cov:")
 
     def goal_cb(self, msg: Angles):
@@ -214,7 +197,7 @@ class MPPIRunner(Node):
         publisher.publish(msg)
 def main(args=None):
     rclpy.init(args=args)
-    node = CEMRunner()
+    node = MPPI_LQRRunner()
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()

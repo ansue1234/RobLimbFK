@@ -82,7 +82,7 @@ class Dynamics:
 
 class LimbDynamics:
     # Derived from Richard Desatnik's paper
-    k, c, a1, a2, a3, a4 = 0.33, 3.72, 1.95, 1.89, 1.54, 2.24
+    k, c, a1, a2, a3, a4 = 0.33, 3.72, 0.195, 0.189, 0.154, 0.224
     M = np.array([[ 1,  0,  0,  0,  0,   0,  0,   0],
                   [-k, -c,  0,  0, a1, a2,  0,   0],
                   [ 0,  0,  0,  1,  0,   0,  0,   0],
@@ -118,7 +118,7 @@ class LimbDynamics:
         return x + dt * dx
     
 class LimbDynamicsLQR:
-    k, c, a1, a3 = 0.33, 3.72, 1.89, 1.89
+    k, c, a1, a3 = 0.33, 3.72, 0.189, 0.189
     M = np.array([[ 1,  0,  0,  0,  0,   0],
                   [-k, -c,  0,  0, a1,  0],
                   [ 0,  0,  0,  1,  0,  0],

@@ -405,7 +405,7 @@ class FiniteHorizonLQRController:
         # Initialize time index.
         self.current_step = 0
 
-    def control(self, x, x_goal):
+    def iterate(self, x, x_goal):
         """
         Compute the control action at the current time step.
         
