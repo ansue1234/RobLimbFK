@@ -33,6 +33,7 @@ setup(
             'pid=model_runner.pid:main',
             'cem=model_runner.cem:main',
             'mppilqr=model_runner.mppi_lqr:main',
+            'policy_time_series=model_runner.policy_time_series:main',
         ],
     },
 )

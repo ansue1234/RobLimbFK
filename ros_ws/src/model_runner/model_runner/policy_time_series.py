@@ -3,33 +3,65 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 import rclpy
-import datetime
 from rclpy.node import Node
-from robo_limb_rl.arch.Actor_Critic_net import RLAgent
-
 from interfaces.msg import Angles, Throttle, State
 from std_msgs.msg import Bool
 
+# Import gym spaces to create dummy observation and action spaces.
+from gym.spaces import Box
+# Import the RLAgent from your Actor_Critic_net.py file.
+from robo_limb_rl.arch.Actor_Critic_net import RLAgent
+
 class PolicyTimeSeriesRunner(Node):
-    # This node receives throttle and then relays the throttle to the arduino
-    # all predicted states and actual states are offsetted by 1 timestep
+    """
+    A ROS node that loads a saved RLAgent (trained with SAC using a time-series input)
+    and uses it to compute throttle commands. This version maintains a sliding window
+    of the last 100 observations. Each observation is represented as a 6-dimensional
+    vector where the first four values correspond to state (theta_x, theta_y, vel_x, vel_y)
+    and the last two are zeros (placeholders for the goal). The actual goal (a 2-dimensional
+    vector) is provided separately to the agent.
+    """
     def __init__(self):
-        super().__init__('Policy_time_series_runner')
-        # Declare parameters using declare_parameters
+        super().__init__('Policy_runner')
         self.declare_parameters(
             namespace='',
             parameters=[
                 ('policy_path', ''),
+                ('head_type', 'seq2seq_encoder'),
+                ('hidden_dim', 512),
+                ('num_layers', 3),
             ]
         )
 
-        # Retrieve the parameters
         self.policy_path = self.get_parameter('policy_path').get_parameter_value().string_value
+        head_type = self.get_parameter('head_type').get_parameter_value().string_value
+        hidden_dim = self.get_parameter('hidden_dim').get_parameter_value().integer_value
+        num_layers = self.get_parameter('num_layers').get_parameter_value().integer_value
+
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.model = RLAgent(6, 2, 256, 2).to(self.device)
-        # print("Hi------------------")
-        # print(torch.load(self.policy_path, map_location=self.device, weights_only=True))
-        self.model.load_state_dict(torch.load(self.policy_path, map_location=self.device, weights_only=True)[0])
+
+        # Create dummy observation and action spaces.
+        # Observation space here is defined with shape (8,) since during training the agent expected
+        # a state vector of 6 numbers (first 6 features) and additional goal features (last 2).
+        # In our implementation, we maintain the state history as a sequence of 6-dimensional vectors,
+        # and pass the actual goal separately.
+        observation_space = Box(low=-np.inf, high=np.inf, shape=(8,), dtype=np.float32)
+        # Assume the action space is 2-dimensional in the range [-1, 1].
+        action_space = Box(low=-1, high=1, shape=(2,), dtype=np.float32)
+
+        # Instantiate the RLAgent as defined in Actor_Critic_net.py.
+        self.model = RLAgent(observation_space, action_space,
+                             head_type=head_type,
+                             agent='SAC',
+                             hidden_dim=hidden_dim,
+                             num_layers=num_layers,
+                             batch_size=1,
+                             freeze_head=False,
+                             pretrained_model=None,
+                             device=self.device).to(self.device)
+
+        # Load the saved state dictionary.
+        self.model.load_state_dict(torch.load(self.policy_path, map_location=self.device))
         self.model.eval()
 
         self.throttle_publisher_ = self.create_publisher(Throttle, 'throttle', 1)
@@ -43,57 +75,83 @@ class PolicyTimeSeriesRunner(Node):
         self.past_time = None
         self.curr_state = None
 
-        self.current_action = None
-        
+        # Buffer to store the last 100 observations (each a 6-dim vector).
+        self.obs_buffer = []
         self.start = False
+        self.goal = None  # Will be set when a goal message is received
         
-    # stores the newest received angles
     def angle_listener_callback(self, msg):
-        # shift the current state to the past state
+        # Shift the previous state.
         self.past_ang = self.curr_ang
         self.past_time = self.curr_time
         
-        # unpack the message
+        # Unpack the incoming angles message.
         curr_angle = Angles()
         curr_angle.theta_x = msg.theta_x
         curr_angle.theta_y = msg.theta_y
         curr_time = self.get_clock().now()
         
-        # handle first iteration
+        # Handle first iteration.
         if self.past_time is None:
             self.past_time = curr_time
         if self.past_ang is None:
             self.past_ang = curr_angle
         
-        # update the current state
+        # Build the current state message with angular velocities.
         self.curr_state = State()
         self.curr_state.theta_x = curr_angle.theta_x
         self.curr_state.theta_y = curr_angle.theta_y
         try:
-            self.curr_state.vel_x = (curr_angle.theta_x - self.past_ang.theta_x) / ((curr_time - self.past_time).nanoseconds*1e-9)
-            self.curr_state.vel_y = (curr_angle.theta_y - self.past_ang.theta_y) / ((curr_time - self.past_time).nanoseconds*1e-9)
-        except:
+            self.curr_state.vel_x = (curr_angle.theta_x - self.past_ang.theta_x) / ((curr_time - self.past_time).nanoseconds * 1e-9)
+            self.curr_state.vel_y = (curr_angle.theta_y - self.past_ang.theta_y) / ((curr_time - self.past_time).nanoseconds * 1e-9)
+        except Exception:
             self.curr_state.vel_x = 0.0
             self.curr_state.vel_y = 0.0
             
         self.curr_ang = curr_angle
         self.curr_time = curr_time
-        # Running policy to get throttle
-        if self.start:
-            self.run_policy(self.curr_state, self.goal)
+        
+        # Create a 6-dimensional observation vector.
+        # The first four values are the state; the last two are placeholders (0.0).
+        obs_vec = np.array([self.curr_state.theta_x,
+                            self.curr_state.theta_y,
+                            self.curr_state.vel_x,
+                            self.curr_state.vel_y,
+                            0.0, 0.0], dtype=np.float32)
+        
+        # Append the new observation to the buffer and keep only the most recent 100.
+        self.obs_buffer.append(obs_vec)
+        if len(self.obs_buffer) > 100:
+            self.obs_buffer.pop(0)
+        
+        # If the controller is active, a goal is set, and we have a full window, run the policy.
+        if self.start and (self.goal is not None) and (len(self.obs_buffer) == 100):
+            self.run_policy()
     
-    def run_policy(self, state, goal):
-        # state = torch.tensor([state.theta_x, state.theta_y, state.vel_x, state.vel_y], dtype=torch.float32).unsqueeze(0).to(self.device)
-        state = torch.tensor([state.theta_x, state.theta_y, state.vel_x, state.vel_y, goal.theta_x, goal.theta_y], dtype=torch.float32).unsqueeze(0).to(self.device)
-        action, _, _ = self.model.get_action(state.unsqueeze(0))
+    def run_policy(self):
+        """
+        Uses the last 100 observations as a time-series input and the current goal (from self.goal)
+        to compute an action using the loaded RLAgent. The observation input is passed as a tuple:
+          - The first element is a tensor of shape [1, 100, 6] representing the state history.
+          - The second element is a tensor of shape [1, 2] representing the current goal.
+        """
+        # Convert the observation buffer into a tensor with shape (1, 100, 6).
+        obs_window = torch.tensor(self.obs_buffer, dtype=torch.float32).unsqueeze(0).to(self.device)
+        # Build the goal tensor (2-dimensional: [goal.theta_x, goal.theta_y]).
+        goal_tensor = torch.tensor([[self.goal.theta_x, self.goal.theta_y]], dtype=torch.float32).to(self.device)
+        
+        # Get the action from the RLAgent using tuple input.
+        action, _, _ = self.model.get_action((obs_window, goal_tensor))
+        
         throttle = Throttle()
         thr = action.detach().cpu().numpy().squeeze()
-        # self.get_logger().info(f"thr: {thr}")
-        throttle.throttle_x = float(np.clip(thr[0]/10, -1, 1))
-        throttle.throttle_y = float(np.clip(thr[1]/10, -1, 1))
+        # Clip the actions to the desired range (adjust scaling if necessary).
+        throttle.throttle_x = float(np.clip(thr[0], -1, 1))
+        throttle.throttle_y = float(np.clip(thr[1], -1, 1))
         self.throttle_publisher_.publish(throttle)
     
     def goal_callback(self, msg):
+        # Save the latest goal message.
         self.goal = msg
     
     def controller_state_callback(self, msg):
@@ -102,14 +160,8 @@ class PolicyTimeSeriesRunner(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-
-    runner = PolicyRunner()
-
+    runner = PolicyTimeSeriesRunner()
     rclpy.spin(runner)
-
-    # Destroy the node explicitly
-    # (optional - otherwise it will be done automatically
-    # when the garbage collector destroys the node object)
     runner.destroy_node()
     rclpy.shutdown()
 
