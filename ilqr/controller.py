@@ -15,7 +15,7 @@ class CEMBase:
                  num_elite=100, 
                  max_iters=100, 
                  alpha=0.5, 
-                 noise_factor=0.25, 
+                 noise_factor=1, 
                  init_mean=None, 
                  init_cov=None,
                  init_err_mu=None,
@@ -304,6 +304,7 @@ class MPPIBase(CEMBase):
         )
         # Create candidate control trajectories around the current nominal trajectory.
         # Each candidate is: u_nominal + noise, where u_nominal is broadcast to shape (num_samples, horizon, u_dim)
+        self.debugger.get_logger().info(f"u_nominal: {self.u_nominal.shape}, noise: {noise_samples.shape}")
         candidate_controls = self.u_nominal[None, :, :] + noise_samples
 
         # Evaluate the cost for each candidate trajectory.
@@ -407,30 +408,33 @@ class FiniteHorizonLQRController:
 
     def iterate(self, x, x_goal):
         """
-        Compute the control action at the current time step.
+        Compute and return the planned control trajectory over the entire horizon.
+        This method simulates the closed-loop evolution using the time-varying gains and 
+        the linear dynamics x_{t+1} = A x_t + B u_t.
         
         Parameters:
-            x: current state (4-dimensional numpy array)
-            x_goal: desired goal state (4-dimensional numpy array)
-                   (if your goal is only for a subset of states, extend it appropriately)
-        
+            x: initial state (4-dimensional numpy array)
+            x_goal: desired goal state (4-dimensional numpy array).
+                    If provided as a 2D vector, it is extended with zeros.
+                    
         Returns:
-            u: control action (2-dimensional numpy array) clipped to [-1,1]
+            utraj: (horizon x 2) numpy array containing the sequence of planned control actions.
         """
-        # Compute the error.
-        error = x.astype(np.float64) - x_goal.astype(np.float64)
+        # Extend x_goal if necessary.
+        if np.prod(x_goal.shape) == 2:
+            x_goal = np.append(x_goal, np.zeros(2))
         
-        # Use the gain corresponding to the current time step.
-        # For steps beyond the horizon, use the last computed gain.
-        idx = min(self.current_step, self.horizon - 1)
-        u = -self.K[idx] @ error
-        
-        # Clip control to [-1, 1] element-wise.
-        u = np.clip(u, -1, 1)
-        
-        # Increment time step.
-        self.current_step += 1
-        return u
+        x_current = x.copy()
+        utraj = []
+        for t in range(self.horizon):
+            error = x_current.astype(np.float64) - x_goal.astype(np.float64)
+            u = -self.K[t] @ error
+            # Clip control to [-1, 1] element-wise.
+            u = np.clip(u, -10, 10)
+            utraj.append(u)
+            # Update state using the linear dynamics.
+            x_current = self.A @ x_current + self.B @ u
+        return np.array(utraj)
 
     def reset(self):
         """

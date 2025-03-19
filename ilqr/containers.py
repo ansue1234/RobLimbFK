@@ -82,11 +82,11 @@ class Dynamics:
 
 class LimbDynamics:
     # Derived from Richard Desatnik's paper
-    k, c, a1, a2, a3, a4 = 0.33, 3.72, 0.195, 0.189, 0.154, 0.224
-    M = np.array([[ 1,  0,  0,  0,  0,   0,  0,   0],
-                  [-k, -c,  0,  0, a1, a2,  0,   0],
+    c, k, a1, a2, a3, a4 = 0.33, 3.72, 1.95, 1.89, 1.54, 2.24
+    M = np.array([[ 0,  1,  0,  0,  0,   0,  0,   0],
                   [ 0,  0,  0,  1,  0,   0,  0,   0],
-                  [ 0,  0, -k, -c,  0,   0, a3, a4]])
+                  [-k, -c,  0,  0, a1,  a2,  0,   0],
+                  [ 0,  0, -k, -c,  0,   0, a3,  a4]])
                            
         
     @staticmethod
@@ -118,11 +118,11 @@ class LimbDynamics:
         return x + dt * dx
     
 class LimbDynamicsLQR:
-    k, c, a1, a3 = 0.33, 3.72, 0.189, 0.189
-    M = np.array([[ 1,  0,  0,  0,  0,   0],
-                  [-k, -c,  0,  0, a1,  0],
+    c, k, a1, a3 = 0.33, 3.72, 1.89, 1.89
+    M = np.array([[ 0,  1,  0,  0,  0,  0],
                   [ 0,  0,  0,  1,  0,  0],
-                  [ 0,  0, -k, -c,  0,  a3]])
+                  [-k, -c,  0,  0, a1,  0],
+                  [ 0,  0, -k, -c,  0, a3]])
                            
         
     @staticmethod
@@ -130,7 +130,7 @@ class LimbDynamicsLQR:
     def cont_dynamics(x, u, M):
         
         # Construct the augmented state matrix: shape (n, 8)
-        aug_state = np.empty(8, dtype=np.float64)
+        aug_state = np.zeros(6, dtype=np.float64)
         aug_state[:4] = x
         aug_state[4:] = u
         return M @ aug_state
@@ -141,7 +141,7 @@ class LimbDynamicsLQR:
         Discretizes the dynamics using Euler integration:
         x_{t+1} = x_t + dt * f(x_t, u_t) works because it is linear
         """
-        dx = LimbDynamics.cont_dynamics(x, u, LimbDynamics.M)
+        dx = LimbDynamicsLQR.cont_dynamics(x, u, LimbDynamicsLQR.M)
         return x + dt * dx
     
 class Cost:

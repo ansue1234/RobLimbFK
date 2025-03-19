@@ -47,7 +47,8 @@ class MPPI_LQRRunner(Node):
                 cost=self.cost,
                 horizon=self.horizon,
                 x_dim=2,
-                u_dim=2)
+                u_dim=2,
+                debugger=self)
             self.mppi = True
         if self.controller == 'LQR':
             self.lqr_controller = FiniteHorizonLQRController(
@@ -61,7 +62,8 @@ class MPPI_LQRRunner(Node):
                 cost=self.cost,
                 horizon=self.horizon,
                 x_dim=2,
-                u_dim=2)
+                u_dim=2,
+                debugger=self)
             self.lqr_controller = FiniteHorizonLQRController(
                 dynamics=self.lqr_dynamics,
                 cost=self.cost,
@@ -71,6 +73,7 @@ class MPPI_LQRRunner(Node):
         
         # ROS publishers & subscribers
         self.throttle_pub = self.create_publisher(Throttle, 'throttle', 1)
+        self.pred = self.create_publisher(Angles, 'pred', 1)
         self.err_cov_pub = self.create_publisher(Float64MultiArray, 'err_cov', 1)
         self.err_mean_pub = self.create_publisher(Float64MultiArray, 'err_mean', 1)
         self.u_cov_pub = self.create_publisher(Float64MultiArray, 'u_cov', 1)
@@ -114,7 +117,7 @@ class MPPI_LQRRunner(Node):
         # Get first-step control from CEM
         self.prev_u = self.best_u
         if self.lqr and not self.mppi:
-            self.best_u = self.lqr_controller.iterate(x0, xgoal)
+            self.best_u = self.lqr_controller.iterate(x0, xgoal)[0]
         elif self.mppi and not self.lqr:
             self.best_u = self.mppi_controller.iterate(x0, xgoal)
         elif self.mppi and self.lqr:
@@ -145,6 +148,16 @@ class MPPI_LQRRunner(Node):
             self.pub_mat(self.mppi_controller.cov, self.cem_cov_pub)
             self.pub_vec(self.mppi_controller.mean, self.cem_mean_pub)
         # self.get_logger().info("Error Cov:")
+        curr_state = np.array([self.curr_state.theta_x, self.curr_state.theta_y, self.curr_state.vel_x, self.curr_state.vel_y])
+        u = np.array([self.best_u[0], self.best_u[1]])
+        self.get_logger().info(f"goal: {self.goal.theta_x}, {self.goal.theta_y}")
+        
+        x_pred = self.lqr_dynamics.f(curr_state, u)
+        
+        pred_msg = Angles()
+        pred_msg.theta_x = x_pred[0]
+        pred_msg.theta_y = x_pred[1]
+        self.pred.publish(pred_msg)
 
     def goal_cb(self, msg: Angles):
         # self.get_logger().info(f"Received goal: {msg.theta_x}, {msg.theta_y}")
@@ -179,6 +192,8 @@ class MPPI_LQRRunner(Node):
 
         # Publish the message
         publisher.publish(msg)
+        
+        
     
     def pub_vec(self, arr, publisher):
         msg = Float64MultiArray()

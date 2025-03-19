@@ -26,7 +26,8 @@ class Visualizer(Node):
         # Retrieve the parameters
         self.traj_path = self.get_parameter('traj_path').get_parameter_value().string_value
         self.angle_subscriber_ = self.create_subscription(Angles, 'limb_angles', self.angle_listener_callback, 1)
-        self.prediction_subscriber_ = self.create_subscription(Angles, 'goal', self.goal_cb, 1)
+        self.goal_subscriber_ = self.create_subscription(Angles, 'goal', self.goal_cb, 1)
+        self.prediction_subscriber_ = self.create_subscription(Angles, 'pred', self.prediction_listener_callback, 1)
         self.timer = self.create_timer(0.05, self.timer_callback)
         self.fig, self.ax = plt.subplots(figsize=(7, 7))
         self.ax.set_xlim(-100, 100)
@@ -38,6 +39,7 @@ class Visualizer(Node):
         self.current_x, self.current_y = [], []
         self.predicted_x, self.predicted_y = [], []
         self.line_gnd_truth, = self.ax.plot(self.current_x, self.current_y, 'b-', markersize=10, linewidth=4, label='Limb Movement')
+        self.pred_traj, = self.ax.plot(self.predicted_x, self.predicted_y, 'r-', markersize=10, linewidth=4, label='Predicted Trajectory')
         self.scatter = self.ax.scatter([], [], c='r', s=100, label='Goal Pos', marker='x')
         # self.line_pred, = self.ax.plot(self.predicted_x, self.predicted_y, color='blue', linestyle='dotted', markersize=10, linewidth=4, label='Pred. (Fine-tuned)')
         self.ax.plot(self.traj_pts['goal_x'], self.traj_pts['goal_y'], 'g', label='Waypoints', linewidth=3)
@@ -58,13 +60,14 @@ class Visualizer(Node):
         self.current_y.append(msg.theta_y)
     
     
-    # def prediction_listener_callback(self, msg):
-    #     # unpack the message
-    #     curr_angle = Angles()
-    #     curr_angle.theta_x = msg.theta_x
-    #     curr_angle.theta_y = msg.theta_y
-    #     self.predicted_x.append(msg.theta_x)
-    #     self.predicted_y.append(msg.theta_y)
+    def prediction_listener_callback(self, msg):
+        # unpack the message
+        curr_angle = Angles()
+        curr_angle.theta_x = msg.theta_x
+        curr_angle.theta_y = msg.theta_y
+        self.predicted_x.append(msg.theta_x)
+        self.predicted_y.append(msg.theta_y)
+        
     def goal_cb(self, msg):
         self.goal = msg
     
@@ -73,6 +76,9 @@ class Visualizer(Node):
         self.line_gnd_truth.set_ydata(self.current_y)
         # self.line_pred.set_xdata(self.predicted_x)
         # self.line_pred.set_ydata(self.predicted_y)
+        self.pred_traj.set_xdata(self.predicted_x)
+        self.pred_traj.set_ydata(self.predicted_y)
+        
         self.ax.relim()
         self.ax.autoscale_view()
         self.ax.legend(loc='upper right', fontsize=18)
