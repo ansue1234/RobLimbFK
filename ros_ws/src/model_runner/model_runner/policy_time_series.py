@@ -8,9 +8,10 @@ from interfaces.msg import Angles, Throttle, State
 from std_msgs.msg import Bool
 
 # Import gym spaces to create dummy observation and action spaces.
-from gym.spaces import Box
+from gymnasium.spaces import Box
 # Import the RLAgent from your Actor_Critic_net.py file.
 from robo_limb_rl.arch.Actor_Critic_net import RLAgent
+from robo_limb_rl.utils.utils import last_items
 
 class PolicyTimeSeriesRunner(Node):
     """
@@ -45,7 +46,7 @@ class PolicyTimeSeriesRunner(Node):
         # a state vector of 6 numbers (first 6 features) and additional goal features (last 2).
         # In our implementation, we maintain the state history as a sequence of 6-dimensional vectors,
         # and pass the actual goal separately.
-        observation_space = Box(low=-np.inf, high=np.inf, shape=(8,), dtype=np.float32)
+        observation_space = Box(low=-np.inf, high=np.inf, shape=(10,), dtype=np.float32)
         # Assume the action space is 2-dimensional in the range [-1, 1].
         action_space = Box(low=-1, high=1, shape=(2,), dtype=np.float32)
 
@@ -74,6 +75,9 @@ class PolicyTimeSeriesRunner(Node):
         self.curr_time = None
         self.past_time = None
         self.curr_state = None
+        self.throttle = Throttle()
+        self.throttle.throttle_x = 0.0
+        self.throttle.throttle_y = 0.0
 
         # Buffer to store the last 100 observations (each a 6-dim vector).
         self.obs_buffer = []
@@ -111,21 +115,25 @@ class PolicyTimeSeriesRunner(Node):
         self.curr_ang = curr_angle
         self.curr_time = curr_time
         
-        # Create a 6-dimensional observation vector.
-        # The first four values are the state; the last two are placeholders (0.0).
-        obs_vec = np.array([self.curr_state.theta_x,
-                            self.curr_state.theta_y,
-                            self.curr_state.vel_x,
-                            self.curr_state.vel_y,
-                            0.0, 0.0], dtype=np.float32)
-        
-        # Append the new observation to the buffer and keep only the most recent 100.
-        self.obs_buffer.append(obs_vec)
-        if len(self.obs_buffer) > 100:
-            self.obs_buffer.pop(0)
+        if self.goal is not None:
+            # Create a 6-dimensional observation vector.
+            # The first four values are the state; the last two are placeholders (0.0).
+            obs_vec = np.array([self.curr_state.theta_x,
+                                self.curr_state.theta_y,
+                                self.curr_state.vel_x,
+                                self.curr_state.vel_y,
+                                self.throttle.throttle_x,
+                                self.throttle.throttle_y,
+                                self.goal.theta_x,
+                                self.goal.theta_y, 0, 0], dtype=np.float32)
+            
+            # Append the new observation to the buffer and keep only the most recent 100.
+            self.obs_buffer.append(obs_vec)
+            if len(self.obs_buffer) > 100:
+                self.obs_buffer.pop(0)
         
         # If the controller is active, a goal is set, and we have a full window, run the policy.
-        if self.start and (self.goal is not None) and (len(self.obs_buffer) == 100):
+        if self.start and (self.goal is not None) and len(self.obs_buffer) == 100:
             self.run_policy()
     
     def run_policy(self):
@@ -138,10 +146,9 @@ class PolicyTimeSeriesRunner(Node):
         # Convert the observation buffer into a tensor with shape (1, 100, 6).
         obs_window = torch.tensor(self.obs_buffer, dtype=torch.float32).unsqueeze(0).to(self.device)
         # Build the goal tensor (2-dimensional: [goal.theta_x, goal.theta_y]).
-        goal_tensor = torch.tensor([[self.goal.theta_x, self.goal.theta_y]], dtype=torch.float32).to(self.device)
-        
+        # goal_tensor = torch.tensor([[self.goal.theta_x, self.goal.theta_y]], dtype=torch.float32).to(self.device)
         # Get the action from the RLAgent using tuple input.
-        action, _, _ = self.model.get_action((obs_window, goal_tensor))
+        action, _, _ = self.model.get_action(obs_window)
         
         throttle = Throttle()
         thr = action.detach().cpu().numpy().squeeze()

@@ -6,7 +6,8 @@
     <!-- <param name="traj_path" value="/home/ansue1234/Research/SML/RobLimbFK/ros_ws/src/traj/trajectories_saw_tooth.csv"/>
   </node> -->
   <node pkg="model_runner" exec="feeder" name="way_point_feeder">
-    <param name="traj_path" value="/home/ansue1234/Research/SML/RobLimbFK/ros_ws/src/traj/way_points_sin.csv"/>
+    <param name="traj_path" value="/home/ansue1234/Research/SML/RobLimbFK/ros_ws/src/traj/way_points_circ.csv"/>
+    <param name="random" value="false"/>
   </node>
   <!-- perform remap so both turtles listen to the same command topic -->
 </launch>

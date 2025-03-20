@@ -1,0 +1,15 @@
+/home/ansue1234/Research/SML/RobLimbFK/setup.py:1: DeprecationWarning: The distutils package is deprecated and slated for removal in Python 3.12. Use setuptools or check PEP 632 for potential alternatives
+  from distutils.core import setup
+running build
+running build_py
+creating /home/ansue1234/Research/SML/RobLimbFK/build/robo_limb_ml/build
+creating /home/ansue1234/Research/SML/RobLimbFK/build/robo_limb_ml/build/lib
+creating /home/ansue1234/Research/SML/RobLimbFK/build/robo_limb_ml/build/lib/robo_limb_ml
+copying robo_limb_ml/__init__.py -> /home/ansue1234/Research/SML/RobLimbFK/build/robo_limb_ml/build/lib/robo_limb_ml
+running install
+running install_lib
+byte-compiling /home/ansue1234/Research/SML/RobLimbFK/install/robo_limb_ml/lib/python3.10/site-packages/robo_limb_ml/__init__.py to __init__.cpython-310.pyc
+running install_egg_info
+Removing /home/ansue1234/Research/SML/RobLimbFK/install/robo_limb_ml/lib/python3.10/site-packages/robo_limb_ml-0.0.1.egg-info
+Writing /home/ansue1234/Research/SML/RobLimbFK/install/robo_limb_ml/lib/python3.10/site-packages/robo_limb_ml-0.0.1.egg-info
+writing list of installed files to '/home/ansue1234/Research/SML/RobLimbFK/build/robo_limb_ml/install.log'
