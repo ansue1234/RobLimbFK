@@ -31,6 +31,7 @@ class PolicyTimeSeriesRunner(Node):
                 ('head_type', 'seq2seq_encoder'),
                 ('hidden_dim', 512),
                 ('num_layers', 3),
+                ('power', True)
             ]
         )
 
@@ -38,7 +39,8 @@ class PolicyTimeSeriesRunner(Node):
         head_type = self.get_parameter('head_type').get_parameter_value().string_value
         hidden_dim = self.get_parameter('hidden_dim').get_parameter_value().integer_value
         num_layers = self.get_parameter('num_layers').get_parameter_value().integer_value
-
+        self.power = self.get_parameter('power').get_parameter_value().bool_value
+        
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
         # Create dummy observation and action spaces.
@@ -46,7 +48,10 @@ class PolicyTimeSeriesRunner(Node):
         # a state vector of 6 numbers (first 6 features) and additional goal features (last 2).
         # In our implementation, we maintain the state history as a sequence of 6-dimensional vectors,
         # and pass the actual goal separately.
-        observation_space = Box(low=-np.inf, high=np.inf, shape=(10,), dtype=np.float32)
+        if not self.power:
+            observation_space = Box(low=-np.inf, high=np.inf, shape=(10,), dtype=np.float32)
+        else:
+            observation_space = Box(low=-np.inf, high=np.inf, shape=(14,), dtype=np.float32)
         # Assume the action space is 2-dimensional in the range [-1, 1].
         action_space = Box(low=-1, high=1, shape=(2,), dtype=np.float32)
 
@@ -93,6 +98,10 @@ class PolicyTimeSeriesRunner(Node):
         curr_angle = Angles()
         curr_angle.theta_x = msg.theta_x
         curr_angle.theta_y = msg.theta_y
+        curr_angle.power_px = msg.power_px
+        curr_angle.power_py = msg.power_py
+        curr_angle.power_nx = msg.power_nx
+        curr_angle.power_ny = msg.power_ny
         curr_time = self.get_clock().now()
         
         # Handle first iteration.
@@ -118,14 +127,28 @@ class PolicyTimeSeriesRunner(Node):
         if self.goal is not None:
             # Create a 6-dimensional observation vector.
             # The first four values are the state; the last two are placeholders (0.0).
-            obs_vec = np.array([self.curr_state.theta_x,
-                                self.curr_state.theta_y,
-                                self.curr_state.vel_x,
-                                self.curr_state.vel_y,
-                                self.throttle.throttle_x,
-                                self.throttle.throttle_y,
-                                self.goal.theta_x,
-                                self.goal.theta_y, 0, 0], dtype=np.float32)
+            if not self.power:
+                obs_vec = np.array([self.curr_state.theta_x,
+                                    self.curr_state.theta_y,
+                                    self.curr_state.vel_x,
+                                    self.curr_state.vel_y,
+                                    self.throttle.throttle_x,
+                                    self.throttle.throttle_y,
+                                    self.goal.theta_x,
+                                    self.goal.theta_y, 0, 0], dtype=np.float32)
+            else:
+                obs_vec = np.array([self.curr_state.theta_x,
+                                    self.curr_state.theta_y,
+                                    self.curr_state.vel_x,
+                                    self.curr_state.vel_y,
+                                    self.throttle.throttle_x,
+                                    self.throttle.throttle_y,
+                                    self.curr_state.power_px,
+                                    self.curr_state.power_py,
+                                    self.curr_state.power_nx,
+                                    self.curr_state.power_ny,
+                                    self.goal.theta_x,
+                                    self.goal.theta_y, 0, 0], dtype=np.float32)
             
             # Append the new observation to the buffer and keep only the most recent 100.
             self.obs_buffer.append(obs_vec)
