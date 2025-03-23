@@ -1,6 +1,11 @@
 python ppo_cont_action.py \
   --env-id "LimbEnv-v0" \
-  --exp_name "ppo_250k_new" \
+  --exp_name "ppo_500k_neg_rew_reg_mlp" \
   --wandb_project_name "soft_limb_rl" \
+  --config_path "./yaml/no_dom/limb_env_no_power_vel.yml" \
+  --seed 1 \
   --wandb_entity "gsue" \
-  --total_timesteps 250000 \
+  --gae_lambda 0.99 \
+  --learning_rate 0.003 \
+  --num_envs 10 \
+  --total_timesteps 500000 \

@@ -1,0 +1,14 @@
+python ppo_cont_action_time_series.py \
+  --env-id "LimbEnv-v0" \
+  --exp_name "ppo_1M_neg_rew_seq2seq" \
+  --wandb_project_name "soft_limb_rl" \
+  --config_path "./yaml/no_dom/limb_env_no_power_vel.yml" \
+  --seed 1 \
+  --wandb_entity "gsue" \
+  --gae_lambda 0.95 \
+  --max_grad_norm 1 \
+  --freeze_head \
+  --pretrained_model \
+  --learning_rate 0.0001 \
+  --num_envs 10 \
+  --total_timesteps 1000000 \
