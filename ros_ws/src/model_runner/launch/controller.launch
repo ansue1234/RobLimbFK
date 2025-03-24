@@ -5,14 +5,14 @@
     <!-- <remap from="/throttle" to="/raw_throttle"/> -->
     <!-- <param name="traj_path" value="/home/ansue1234/Research/SML/RobLimbFK/ros_ws/src/traj/trajectories_saw_tooth.csv"/>
   </node> -->
-  <node pkg="model_runner" exec="visualizer" name="visualizer">
+  <!-- <node pkg="model_runner" exec="visualizer" name="visualizer">
     <param name="traj_path" value="/home/ansue1234/Research/SML/RobLimbFK/ros_ws/src/traj/way_points_circ.csv"/>
-  </node>
+  </node> -->
   <!-- <node pkg="model_runner" exec="feeder" name="way_point_feeder"> -->
     <!-- <param name="traj_path" value="/home/ansue1234/Research/SML/RobLimbFK/ros_ws/src/traj/way_points_circ.csv"/> -->
     <!-- <param name="random" value="false"/> -->
   <!-- </node> -->
-  <!-- <node pkg="model_runner" exec="pid" name="pid_control"/> -->
+  <node pkg="model_runner" exec="pid" name="pid_control"/>
   <!-- <node pkg="model_runner" exec="mppilqr" name="mppilqr">
     <param name="double_shooting" value="false"/>
     <param name="controller" value="LQR"/>

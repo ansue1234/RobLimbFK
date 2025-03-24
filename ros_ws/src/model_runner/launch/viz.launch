@@ -1,0 +1,14 @@
+<!-- example.launch.xml -->
+
+<launch>
+
+  <node pkg="model_runner" exec="visualizer" name="viz">
+    <!-- <param name="traj_path" value="/home/ansue1234/Research/SML/RobLimbFK/ros_ws/src/traj/way_points_square.csv"/> -->
+    <param name="traj_path" value="/home/ansue1234/Research/SML/RobLimbFK/ros_ws/src/traj/way_points_square.csv"/>
+    <!-- <param name="traj_path" value="/home/ansue1234/Research/SML/RobLimbFK/ros_ws/src/traj/way_points_spiral.csv"/>
+    <param name="traj_path" value="/home/ansue1234/Research/SML/RobLimbFK/ros_ws/src/traj/way_points_circ.csv"/>
+    <param name="traj_path" value="/home/ansue1234/Research/SML/RobLimbFK/ros_ws/src/traj/way_points_traj.csv"/> -->
+
+    <remap from="/limb_angles" to="/ang"/>
+  </node>
+</launch>

@@ -36,11 +36,11 @@ class PIDRunner(Node):
         self.declare_parameters(
             namespace='',
             parameters=[
-                ('pid_x.kp', 0.5),
-                ('pid_x.ki', 0.0),
+                ('pid_x.kp', 2.0),
+                ('pid_x.ki', 0.001),
                 ('pid_x.kd', 0.1),
-                ('pid_y.kp', 0.5),
-                ('pid_y.ki', 0.0),
+                ('pid_y.kp', 2.0),
+                ('pid_y.ki', 0.001),
                 ('pid_y.kd', 0.1),
                 ('use_state', True)
             ]

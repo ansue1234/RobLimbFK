@@ -79,7 +79,7 @@ class PolicyTimeSeriesRunner(Node):
         self.past_ang = None
         self.curr_time = None
         self.past_time = None
-        self.curr_state = None
+        self.curr_state = State()
         self.throttle = Throttle()
         self.throttle.throttle_x = 0.0
         self.throttle.throttle_y = 0.0
@@ -88,6 +88,9 @@ class PolicyTimeSeriesRunner(Node):
         self.obs_buffer = []
         self.start = False
         self.goal = None  # Will be set when a goal message is received
+        
+        self.hidden = (torch.zeros(num_layers, 1, hidden_dim).to(self.device),
+                       torch.zeros(num_layers, 1, hidden_dim).to(self.device))
         
     def angle_listener_callback(self, msg):
         # Shift the previous state.
@@ -110,13 +113,23 @@ class PolicyTimeSeriesRunner(Node):
         if self.past_ang is None:
             self.past_ang = curr_angle
         
+        alpha = 0.8
         # Build the current state message with angular velocities.
+        past_state = State()
+        past_state.theta_x = self.past_ang.theta_x
+        past_state.theta_y = self.past_ang.theta_y
+        past_state.vel_x = self.curr_state.vel_x
+        past_state.vel_y = self.curr_state.vel_y
+        
         self.curr_state = State()
-        self.curr_state.theta_x = curr_angle.theta_x
-        self.curr_state.theta_y = curr_angle.theta_y
+        self.curr_state.theta_x = (alpha*curr_angle.theta_x+(1-alpha)*self.past_ang.theta_x)
+        self.curr_state.theta_y = (alpha*curr_angle.theta_y+(1-alpha)*self.past_ang.theta_y)
         try:
-            self.curr_state.vel_x = (curr_angle.theta_x - self.past_ang.theta_x) / ((curr_time - self.past_time).nanoseconds * 1e-9)
-            self.curr_state.vel_y = (curr_angle.theta_y - self.past_ang.theta_y) / ((curr_time - self.past_time).nanoseconds * 1e-9)
+            curr_vel_x = (curr_angle.theta_x - self.past_ang.theta_x) / ((curr_time - self.past_time).nanoseconds * 1e-9)
+            curr_vel_y = (curr_angle.theta_y - self.past_ang.theta_y) / ((curr_time - self.past_time).nanoseconds * 1e-9)
+            
+            self.curr_state.vel_x = (alpha*curr_vel_x+(1-alpha)*past_state.vel_x)
+            self.curr_state.vel_y = (alpha*curr_vel_y+(1-alpha)*past_state.vel_y)
         except Exception:
             self.curr_state.vel_x = 0.0
             self.curr_state.vel_y = 0.0
@@ -143,10 +156,10 @@ class PolicyTimeSeriesRunner(Node):
                                     self.curr_state.vel_y,
                                     self.throttle.throttle_x,
                                     self.throttle.throttle_y,
-                                    self.curr_state.power_px,
-                                    self.curr_state.power_py,
-                                    self.curr_state.power_nx,
-                                    self.curr_state.power_ny,
+                                    self.curr_ang.power_px,
+                                    self.curr_ang.power_py,
+                                    self.curr_ang.power_nx,
+                                    self.curr_ang.power_ny,
                                     self.goal.theta_x,
                                     self.goal.theta_y, 0, 0], dtype=np.float32)
             
@@ -154,9 +167,10 @@ class PolicyTimeSeriesRunner(Node):
             self.obs_buffer.append(obs_vec)
             if len(self.obs_buffer) > 100:
                 self.obs_buffer.pop(0)
-        
+            # self.obs_buffer = np.array([obs_vec])
         # If the controller is active, a goal is set, and we have a full window, run the policy.
         if self.start and (self.goal is not None) and len(self.obs_buffer) == 100:
+        # if self.start and (self.goal is not None):
             self.run_policy()
     
     def run_policy(self):
@@ -171,7 +185,7 @@ class PolicyTimeSeriesRunner(Node):
         # Build the goal tensor (2-dimensional: [goal.theta_x, goal.theta_y]).
         # goal_tensor = torch.tensor([[self.goal.theta_x, self.goal.theta_y]], dtype=torch.float32).to(self.device)
         # Get the action from the RLAgent using tuple input.
-        action, _, _ = self.model.get_action(obs_window)
+        action, _, _, _ = self.model.get_action(obs_window)
         
         throttle = Throttle()
         thr = action.detach().cpu().numpy().squeeze()
