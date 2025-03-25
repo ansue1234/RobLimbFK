@@ -2,31 +2,40 @@
 #include <Wire.h>
 #include "SparkFun_Displacement_Sensor_Arduino_Library.h" // Click here to get the library: http://librarymanager/All#SparkFun_Displacement_Sensor
 
+//byte deviceType;
 ADS myFlexSensor;
 String received_cmd;
 int x_throttle;
 int y_throttle;
-//const float PWMMaxPX = 40.00;
-//const float PWMMinPX = 20.00;
-//const float PWMMaxNX = 40.00;
-//const float PWMMinNX = 20.00;
-//const float PWMMaxPY = 40.00;
-//const float PWMMinPY = 20.00;
-//const float PWMMaxNY = 40.00;
-//const float PWMMinNY = 20.00;
-const float PWMMaxPX = 25.00;
-const float PWMMinPX = 15.00;
-const float PWMMaxNX = 25.00;
-const float PWMMinNX = 15.00;
-const float PWMMaxPY = 25.00;
-const float PWMMinPY = 15.00;
-const float PWMMaxNY = 25.00;
-const float PWMMinNY = 15.00;
+const float PWMMaxPX = 40.00;
+const float PWMMinPX = 20.00;
+const float PWMMaxNX = 40.00;
+const float PWMMinNX = 20.00;
+const float PWMMaxPY = 40.00;
+const float PWMMinPY = 20.00;
+const float PWMMaxNY = 40.00;
+const float PWMMinNY = 20.00;
+const float cool_const = 0.2;
+//const float PWMMaxPX = 25.00;
+//const float PWMMinPX = 15.00;
+//const float PWMMaxNX = 25.00;
+//const float PWMMinNX = 15.00;
+//const float PWMMaxPY = 25.00;
+//const float PWMMinPY = 15.00;
+//const float PWMMaxNY = 25.00;
+//const float PWMMinNY = 15.00;
 
 const int num_PWM_signals = 21;
 
 float PWM_x_signals[num_PWM_signals];
 float PWM_y_signals[num_PWM_signals];
+
+float pwr_px = 0.0;
+float pwr_nx = 0.0;
+float pwr_py = 0.0;
+float pwr_ny = 0.0;
+float prev_t = 0.0;
+float curr_t = 0.0;
 
 const int PWMPX = 5;
 const int PWMNX = 3;
@@ -73,8 +82,16 @@ void setup() {
     while (1)
       ;
   }
+
+//  deviceType = myFlexSensor.getDeviceType();
+//  if (deviceType==ADS_ONE_AXIS)
+//    Serial.print("");
+//  else if (deviceType ==ADS_TWO_AXIS)
+//    Serial.println(F("TWO axis displacement sensor detected"));
+    
   PWMRange(PWM_x_signals, PWMMaxPX, PWMMinPX, PWMMaxNX, PWMMinNX);
   PWMRange(PWM_y_signals, PWMMaxPY, PWMMinPY, PWMMaxNY, PWMMinNY);
+  curr_t = millis();
 }
 
 void loop() {
@@ -112,6 +129,29 @@ void loop() {
   if (myFlexSensor.available() == true) {
           float BX = myFlexSensor.getX();
           float BY = myFlexSensor.getY();
+          //Compute power
+          prev_t = curr_t;
+          float t = millis();
+          curr_t = t;
+          float dt = (curr_t - prev_t)/1000;
+          
+          // Simulate cooling
+          pwr_px = pwr_px*(1 - cool_const*dt);
+          pwr_py = pwr_py*(1 - cool_const*dt);
+          pwr_ny = pwr_ny*(1 - cool_const*dt);
+          pwr_nx = pwr_nx*(1 - cool_const*dt);
+          //Simulate heating
+          if (x_throttle > 0){
+            pwr_px += abs(x_throttle)*abs(x_throttle)/3*dt;
+          } else {
+            pwr_nx += abs(x_throttle)*abs(x_throttle)/3*dt;
+          }
+          if (y_throttle > 0){
+            pwr_py += abs(y_throttle)*abs(y_throttle)/3*dt;
+          } else {
+            pwr_ny += abs(y_throttle)*abs(y_throttle)/3*dt;
+          }
+          
           Serial.print("Data,");
           Serial.print(BX);
           Serial.print(",");
@@ -121,9 +161,17 @@ void loop() {
           Serial.print(",");
           Serial.print(y_throttle);
           Serial.print(",");
-          float t = millis();
           Serial.print(t);
+          Serial.print(",");
+          Serial.print(pwr_px);
+          Serial.print(",");
+          Serial.print(pwr_py);
+          Serial.print(",");
+          Serial.print(pwr_nx);
+          Serial.print(",");
+          Serial.print(pwr_ny);
           Serial.println();
+
           if ((abs(BX) < max_state) && (abs(BY) < max_state)) {
             analogWrite(PWMPX,actual_px_pwm);
             analogWrite(PWMNX,actual_nx_pwm);
