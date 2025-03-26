@@ -265,8 +265,8 @@ class LimbEnv(gym.Env):
         self.t += 1
         
         # Linearly decrese goal tolerance base on time
-        if not self.evals: 
-            self.goal_tolerance = max(5*(1 - self.t/(self.max_steps*0.5)), self.goal_tolerance)
+        # if not self.evals: 
+        self.goal_tolerance = max(5*(1 - self.t/(self.max_steps*0.5)), self.goal_tolerance)
         # print("t", self.t)
         # compute reward
         reward, rew_comp = self.compute_reward(self.state, self.goal, action)
