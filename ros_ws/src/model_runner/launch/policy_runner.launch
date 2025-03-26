@@ -9,8 +9,8 @@
     <param name="policy_path" value="/home/ansue1234/Research/SML/RobLimbFK/ros_ws/src/model_runner/policies/sac_1M_new.cleanrl_model"/>
   </node> -->
   <node pkg="model_runner" exec="policy_time_series" name="policy">
-    <param name="policy_path" value="/home/ansue1234/Research/SML/RobLimbFK/ros_ws/src/model_runner/policies/no_head.cleanrl_model"/>
-    <param name="head_type" value="empty"/>
+    <param name="policy_path" value="/home/ansue1234/Research/SML/RobLimbFK/ros_ws/src/model_runner/policies/freeze_pretrain_power_encoder.cleanrl_model"/>
+    <param name="head_type" value="seq2seq_encoder"/>
   </node>
   <!-- <node pkg="model_runner" exec="visualizer" name="viz">
     <param name="traj_path" value="/home/ansue1234/Research/SML/RobLimbFK/ros_ws/src/traj/way_points_spiral.csv"/>
